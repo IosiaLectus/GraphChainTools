@@ -1,0 +1,731 @@
+import sys, os, subprocess, random, time, pickle, json
+import networkx as nx
+import numpy as np
+from functools import reduce
+from matplotlib import pyplot as plt
+from itertools import permutations
+import cvxpy as cy
+
+#######################################
+# Throughout most of this document,
+# graphs will be represented by lists
+# of edges
+#######################################
+
+# Take a list of edges and convert it to an adjacency matrix
+def adjMatrix(nvertices, graph):
+    mat = [[0 for i in range(nvertices)] for j in range(nvertices)]
+    for pair in graph:
+        # Note that we number our vertices starting at one
+        mat[pair[0]-1][pair[1]-1] = 1
+        mat[pair[1]-1][pair[0]-1] = 1
+    return np.array(mat)
+
+# Write graph to a string (e.g. in preparation to write to a file)
+def graphListToString(graphList, verbose=False):
+    ret = ""
+    for pair in graphList:
+        line = "{} {}".format(pair[0],pair[1])
+        ret += line
+        ret += "\n"
+    if verbose:
+        print()
+        print(ret)
+    return ret
+
+# write graph to a file
+def graphToFile(graphList, fileName, verbose=False):
+    to_write = graphListToString(graphList, verbose)
+    file = open(fileName,'w')
+    file.write(to_write)
+    file.close()
+
+
+# visualize graph using networkx and pyplot
+def visualizeGraph(graphList):
+    G = nx.Graph()
+    for pair in graphList:
+        G.add_edge(pair[0],pair[1])
+    nx.draw_circular(G, with_labels=True)
+    plt.show()
+
+######################
+# A bunch of metrics
+#####################
+
+# Graph 'distance' based on difference between number of edges
+def edgeCountDistance(graphA, graphB):
+    return int(np.abs(len(graphA)-len(graphB)))
+
+def specDistance(graphA, graphB):
+    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
+    if len(nodeVals)==0:
+        return 0
+    nvertices = max(nodeVals)
+    matA = adjMatrix(nvertices, graphA)
+    matB = adjMatrix(nvertices, graphB)
+    lamA, vecA = np.linalg.eig(matA)
+    lamB, vecB = np.linalg.eig(matB)
+    #lamListA = list(lamA)
+    #lamListB = list(lamB)
+    #lamListA.sort()
+    #lamListB.sort()
+    lamA.sort()
+    lamB.sort()
+    distList = list(lamA-lamB)
+    return float(np.sqrt(sum([x**2 for x in distList])))
+
+def doublyStochasticMatrixDistance(graphA, graphB):
+    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
+    if len(nodeVals)==0:
+        return 0
+    nvertices = max(nodeVals)
+    A = adjMatrix(nvertices, graphA)
+    B = adjMatrix(nvertices, graphB)
+    ones = cy.Constant(np.ones(nvertices))       # constant vector of all ones
+    P    = cy.Variable((nvertices,nvertices),nonneg=True)   # matrix P
+    obj  = cy.Minimize(cy.norm(A@P-P@B))     # objective function
+    cons = ([P@ones == ones, ones.T@P == ones]) # doubly stochastic P
+    p    = cy.Problem(obj, cons)            # problem definition
+
+    # solve problem:
+    p.solve(solver='SCS', verbose= False)
+    return obj.value
+
+
+def disagreementCount(graphA, graphB):
+    diffs = [e for e in graphA if not e in graphB] + [e for e in graphB if not e in graphA]
+    return len(diffs)
+
+# Apply a permutation to a graph
+def permuteGraph(perm, graph):
+    nodeVals = [pair[1] for pair in graph]
+    nvertices = max(nodeVals)
+    ret = []
+    for pair in graph:
+        A = pair[0]
+        B = pair[1]
+        permA = perm[A-1]+1
+        permB = perm[B-1]+1
+        new_pair = [permA, permB]
+        new_pair.sort()
+        ret.append(tuple(new_pair))
+    return ret
+
+
+def minDistance(graphA, graphB):
+    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
+    if len(nodeVals)==0:
+        nvertices = 0
+        return 0
+    nvertices = max(nodeVals)
+    perms = permutations(list(range(nvertices)))
+    ret = nvertices
+    for perm in perms:
+        dist = disagreementCount(graphA, permuteGraph(perm, graphB))
+        if dist<ret:
+            ret = dist
+    return ret
+
+def minDistanceCUDA(graphA, graphB):
+    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
+    if len(nodeVals)==0:
+        nvertices = 0
+        return 0
+    nvertices = max(nodeVals)
+    fileA ="graphs/tempA.txt"
+    fileB ="graphs/tempB.txt"
+    outputFile = "graphs/tempOut.txt"
+    outputFile2 = "graphs/tempOut2.txt"
+    graphToFile(graphA, fileA)
+    graphToFile(graphB, fileB)
+    os.system("rm {}".format(outputFile))
+    os.system("rm {}".format(outputFile2))
+    os.system("./bruteforce {} {} {} 1 0 0 {} >> {}".format(fileA, fileB, outputFile, nvertices, outputFile2))
+    file = open(outputFile2,'r')
+    output = file.read()
+    outputLines = output.split('\n')
+    outputLines = [line for line in outputLines if 'GPU Opt' in line]
+    return float(outputLines[0].split()[-1])
+
+
+
+def meanDistance(graphA, graphB):
+    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
+    if len(nodeVals)==0:
+        nvertices = 0
+        return 0
+    nvertices = max(nodeVals)
+    perms = permutations(list(range(nvertices)))
+    ret = 0
+    nperms = 0
+    for perm in perms:
+        ret += disagreementCount(graphA, permuteGraph(perm, graphB))
+        nperms +=1
+    ret = ret/nperms
+    return ret
+
+def meanDistanceCUDA(graphA, graphB):
+    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
+    if len(nodeVals)==0:
+        nvertices = 0
+        return 0
+    nvertices = max(nodeVals)
+    fileA ="graphs/tempA.txt"
+    fileB ="graphs/tempB.txt"
+    outputFile = "graphs/tempOut.txt"
+    outputFile2 = "graphs/tempOut2.txt"
+    graphToFile(graphA, fileA)
+    graphToFile(graphB, fileB)
+    os.system("rm {}".format(outputFile))
+    os.system("rm {}".format(outputFile2))
+    os.system("./bruteforce {} {} {} 1 0 0 {} >> {}".format(fileA, fileB, outputFile, nvertices, outputFile2))
+    file = open(outputFile2,'r')
+    output = file.read()
+    outputLines = output.split('\n')
+    outputLines = [line for line in outputLines if 'GPU Mean' in line]
+    return float(outputLines[0].split()[-1])
+
+
+#########################
+# Generate random graphs
+#########################
+
+
+# Create a correlated pair of Erdos-Renyi graphs
+def CorrelatedERPair(num_vertices, p11, p10, p01, verbose=False, to_file=False, fileNameA=None,fileNameB=None):
+
+    pairs = [(a+1,b+1) for b in range(num_vertices) for a in range(b)]
+
+    listA = []
+    listB = []
+
+    for pair in pairs:
+        r = random.random()
+        rpair = random.choices([(1,1),(1,0),(0,1),(0,0)],weights=[p11,p10,p01,1-p11-p10-p01])[0]
+        if rpair[0]==1:
+            listA.append(pair)
+        if rpair[1]==1:
+            listB.append(pair)
+
+    if to_file:
+        graphToFile(listA, fileNameA, verbose)
+        graphToFile(listB, fileNameB, verbose)
+    elif verbose:
+        graphListToString(listA, True)
+        graphListToString(listB, True)
+
+    return listA, listB
+
+# Different parameterization of CorrelatedERPair
+def CorrelatedERPairPQ(num_vertices, p, flipProb0, flipProb1, verbose=False, to_file=False, fileNameA=None,fileNameB=None):
+    p11 = p*(1-flipProb1)+(1-p)*flipProb0
+    p01 = (1-p)*flipProb0
+    p10 = p*flipProb1
+    return CorrelatedERPair(num_vertices, p11, p10, p01, verbose, to_file, fileNameA,fileNameB)
+
+# Given a graph, form a new graph correlated to it, such that if the first graph is ER, the pair is CER
+def graphFromConditional(seedGraph, numVertices, flipProb0, flipProb1, verbose=False, to_file=False, filename=None):
+
+    pairs = [(a+1,b+1) for b in range(numVertices) for a in range(b)]
+
+    ret = []
+
+    for pair in pairs:
+        if pair in seedGraph:
+            choice = random.choices([0,1], weights=[flipProb1, 1-flipProb1])[0]
+        else:
+            choice = random.choices([0,1], weights=[1-flipProb0,flipProb0])[0]
+        if choice==1:
+            ret.append(pair)
+
+    if to_file:
+        graphToFile(ret, filename, verbose)
+    elif verbose:
+        graphListToString(ret, True)
+
+    return ret
+
+# Create a chain of graphs which are pairwise CER
+def graphChain(nvertices, ngraphs, p, flipProb0, flipProb1, verbose=False, to_file=False, fileNameRoot="graph"):
+    if ngraphs<2:
+        return
+    fileNameList = ["{}{}.txt".format(fileNameRoot, i) for i in range(ngraphs)]
+    g0, g1 = CorrelatedERPairPQ(nvertices, p, flipProb0, flipProb1, verbose, to_file, fileNameList[0],fileNameList[1])
+    graphList = [g0, g1]
+    for i in range(2,ngraphs):
+        graphList.append(graphFromConditional(graphList[i-1], nvertices, flipProb0, flipProb1, verbose, to_file, fileNameList[i]))
+    return graphList
+
+# Given a list of graphs, order them according to their edge counts
+def order_by_edge_counts(graphs, shuffle=False):
+    to_order = [(i,len(graphs[i])) for i in range(len(graphs))]
+    to_order.reverse()
+    if shuffle:
+        random.shuffle(to_order)
+    ordered = sorted(to_order, key= lambda x: x[1])
+    return [x[0] for x in ordered]
+
+# implement greedy algorithm for a metric. This assumes that the first element of graphs is the true first element
+def order_by_metric_greedy_cached(metric, graphs, shuffle=False):
+    to_order = [(i, graphs[i]) for i in range(len(graphs))]
+    metric_cache = {(a,b): -1 for b in range(len(graphs)) for a in range(b+1)}
+    graphsLeft = to_order[1:]
+    graphsLeft.reverse()
+    if shuffle:
+        random.shuffle(graphsLeft)
+    graphsOrdered = [to_order[0]]
+    while len(graphsLeft)>0:
+        indexMin = 0
+        for i in range(1,len(graphsLeft)):
+            a = graphsOrdered[-1][0]
+            b = graphsLeft[indexMin][0]
+            c = graphsLeft[i][0]
+            currentBestLen = metric_cache[(min([a,b]),max([a,b]))]
+            if currentBestLen<0:
+                currentBestLen = metric(graphsLeft[indexMin][1], graphsOrdered[-1][1])
+                metric_cache[(min([a,b]),max([a,b]))] = currentBestLen
+            lenAD = [ metric_cache[ min([a,d]),max([a,d]) ] for d in range(len(graphs)) if not d==a and not d==b ]
+            lenCD = [ metric_cache[ min([c,d]),max([c,d]) ] for d in range(len(graphs)) if not d==a and not d==b ]
+            LBList = [np.abs(lenAD[i] - lenCD[i]) for i in range(len(lenAD)) if lenAD[i]>=0 and lenCD[i]>=0]
+            lowerBound = 0
+            if len(LBList)>0:
+                lowerBound = max(LBList)
+            if currentBestLen > lowerBound:
+                thisLen = metric(graphsLeft[i][1], graphsOrdered[-1][1])
+                metric_cache[(min([a,c]),max([a,c]))] = thisLen
+                if currentBestLen > thisLen:
+                    indexMin = i
+        graphsOrdered.append(graphsLeft.pop(indexMin))
+    return [x[0] for x in graphsOrdered]
+
+# implement greedy algorithm for a metric. This assumes that the first element of graphs is the true first element
+def order_by_metric_greedy(metric, graphs, shuffle=False):
+    to_order = [(i, graphs[i]) for i in range(len(graphs))]
+    graphsLeft = to_order[1:]
+    graphsLeft.reverse()
+    if shuffle:
+        random.shuffle(graphsLeft)
+    graphsOrdered = [to_order[0]]
+    while len(graphsLeft)>0:
+        indexMin = 0
+        currentBestLen = metric(graphsLeft[indexMin][1], graphsOrdered[-1][1])
+        for i in range(1,len(graphsLeft)):
+            thisLen = metric(graphsLeft[i][1], graphsOrdered[-1][1])
+            if currentBestLen > thisLen:
+                indexMin = i
+                currentBestLen = thisLen
+        graphsOrdered.append(graphsLeft.pop(indexMin))
+    return [x[0] for x in graphsOrdered]
+
+def order_from_distance_matrix(dmat, shuffle=False):
+    ngraphs = max([key[1] for key in dmat.keys()])
+    graphsLeft = [i for i in range(1,ngraphs)]
+    graphsLeft.reverse()
+    if shuffle:
+        random.shuffle(graphsLeft)
+    ordered = [0]
+    while len(graphsLeft)>0:
+        indexMin = 0
+        bestPair = [ordered[-1],graphsLeft[indexMin]]
+        bestPair = (min(bestPair), max(bestPair))
+        currentBestLen = dmat[bestPair]
+        for i in range(1,len(graphsLeft)):
+            thisPair = [ordered[-1],graphsLeft[i]]
+            thisPair = (min(thisPair), max(thisPair))
+            thisLen = dmat[thisPair]
+            if currentBestLen > thisLen:
+                indexMin = i
+                currentBestLen = thisLen
+        ordered.append(graphsLeft.pop(indexMin))
+    return ordered
+
+
+def populate_folder(nshots, nvertices, ngraphs, p, q, qq, dir):
+    subdir = "N{}_p_{}_q_{}_qq_{}".format(nvertices,p,q,qq)
+    os.system("mkdir {}/{}".format(dir, subdir))
+    for i in range(nshots):
+        shotdir = "{}/{}/run{}".format(dir, subdir, i)
+        os.system("mkdir {}".format(shotdir))
+        fileRoot="{}/graph".format(shotdir)
+        graphChain(nvertices, ngraphs, p, q, qq, verbose=False, to_file=True,fileNameRoot=fileRoot)
+
+def read_file(name):
+    file = open(name, 'r')
+    graph = file.read().split("\n")
+    file.close()
+    graph = [e.split() for e in graph]
+    graph = [tuple([int(x) for x in e]) for e in graph]
+    graph = [e for e in graph if len(e)==2]
+    return graph
+
+def read_chain(dir, ngraphs):
+    files = bytes(subprocess.check_output(["ls",dir])).decode('utf-8').split()
+    ngraphs = min([ngraphs,len(files)])
+    chain = []
+    for i in range(ngraphs):
+        fstring = "{}/graph{}.txt".format(dir,i)
+        graph = read_file(fstring)
+        chain.append(graph)
+    return chain
+
+def read_ensemble(dir,nshots,chain_length):
+    ensemble = []
+    folders = bytes(subprocess.check_output(["ls",dir])).decode('utf-8').split()
+    if nshots<len(folders):
+        folders = folders[:nshots]
+    for folder in folders:
+        chain = read_chain("{}/{}".format(dir,folder), chain_length)
+        ensemble.append(chain)
+    return ensemble
+
+# This is taken verbatim from https://stackoverflow.com/questions/16488684/how-to-unpickle-a-file-in-python
+def unpickle(filename):
+    f = open(filename, "rb")
+    d = pickle.load(f)
+    f.close()
+    return d
+
+def pairwise_distance_matrix(graphs,metric,to_file=False, file=None):
+    pairs = [(i,j) for j in range(len(graphs)) for i in range(j)]
+    distances = {pair: metric(graphs[pair[0]],graphs[pair[1]]) for pair in pairs}
+    if to_file:
+        outp = open(file,'wb')
+        pickle.dump(distances, outp, -1)
+    return distances
+
+def pairwise_distance_dict_to_list(dmat_dict, L=-1):
+    if L<1:
+        L = max([k[1] for k in dmat_dict.keys()])-1
+    dmat_list = [[float(dmat_dict[(i,j)]) if i<j else dmat_dict[(j,i)] if j<i else 0 for i in range(L)] for j in range(L)]
+    return dmat_list
+
+def pairwise_distances_from_folder(folder, ngraphs, metric, to_file=False, file_name=None):
+    graphs = read_chain(folder, ngraphs)
+    file_path = "{}/{}.pkl".format(folder, file_name)
+    distances = pairwise_distance_matrix(graphs, metric, to_file, file_path)
+    return distances
+
+def pairwise_distance_ensemble(dir, nshots, ngraphs, metric, metric_name):
+    folders = bytes(subprocess.check_output(["ls",dir])).decode('utf-8').split()
+    if nshots<len(folders):
+        folders = folders[:nshots]
+    for folder in folders:
+        path = "{}/{}".format(dir,folder)
+        pairwise_distances_from_folder(path, ngraphs, metric, True, metric_name)
+
+def pairwise_distance_ensemble_parallel(dir, nshots, ngraphs, metric_name):
+    folders = bytes(subprocess.check_output(["ls",dir])).decode('utf-8').split()
+    if nshots<len(folders):
+        folders = folders[:nshots]
+    for folder in folders:
+        path = "{}/{}".format(dir,folder)
+        os.system("python3 CERParallel.py {} {} {}".format(ngraphs, metric_name, path))
+
+
+
+def evaluate_metric(chains, orderFun):
+    perms = [orderFun(chain) for chain in chains]
+    total_number = len(perms)
+    if len(perms)<1:
+        return []
+    nvertices = len(perms[0])
+    perm_scores = [[int(p[i]==i) for i in range(nvertices)] for p in perms]
+    correct_at_index = reduce(lambda x, y: [x[i]+y[i] for i in range(min([len(x),len(y)]))], perm_scores)
+    correct_at_index = [p/total_number for p in correct_at_index]
+    correct_to_index = []
+    correct_perms = [p for p in perm_scores]
+    for i in range(nvertices):
+        correct_perms = [p for p in correct_perms if p[i]==1]
+        correct_count = len(correct_perms)
+        correct_to_index.append(correct_count/total_number)
+    return correct_to_index, correct_at_index
+
+def evaluate_all(dir,nshots,chain_length):
+
+    chains = read_ensemble(dir,nshots,chain_length)
+    #print()
+    #print(chains[0][0])
+    print()
+
+    print("Performance of edge counting")
+    print()
+    print(evaluate_metric(chains, order_by_edge_counts))
+    print()
+
+    print("disagreementCount")
+    print()
+    print(evaluate_metric(chains, lambda x: order_by_metric_greedy(disagreementCount, x)))
+    print()
+
+    print("edgeCountDistance")
+    print()
+    print(evaluate_metric(chains, lambda x: order_by_metric_greedy(edgeCountDistance, x)))
+    print()
+
+    print("specDistance")
+    print()
+    print(evaluate_metric(chains, lambda x: order_by_metric_greedy(specDistance, x)))
+    print()
+
+    print("doublyStochasticMatrixDistance")
+    print()
+    print(evaluate_metric(chains, lambda x: order_by_metric_greedy_cached(doublyStochasticMatrixDistance, x)))
+    print()
+
+    print("minDistanceCUDA")
+    print()
+    print( evaluate_metric( chains, lambda x: order_by_metric_greedy_cached(minDistanceCUDA, x) ) )
+    print()
+
+
+###########################
+# Store data in json
+# instead of .txt and .pkl
+# documenmts
+###########################
+
+def update_json_with_chains(fname, nshots, ngraphs, n, p, q):
+    chains = [graphChain(n, ngraphs, p, q, q) for i in range(nshots)]
+    json_file = open(fname,"r")
+    dict = json.load(json_file)
+    json_file.close()
+    n = str(n)
+    p = str(p)
+    q = str(q)
+    if n in dict.keys():
+        if p in dict[n].keys():
+            if q in dict[n][p].keys():
+                if 'chains' in dict[n][p][q].keys():
+                    dict[n][p][q]['chains'] = dict[n][p][q]['chains'] + chains
+                else:
+                    dict[n][p][q].update({'chains': chains})
+            else:
+                dict[n][p].update({q: {'chains': chains}})
+        else:
+            dict[n].update({p: {q: {'chains': chains}}})
+    else:
+        dict.update({n: {p: {q: {'chains': chains}}}})
+    json_file = open(fname, "w")
+    json.dump(dict, json_file)
+    json_file.close()
+
+def update_json_with_chains_from_folders(fname, nshots, ngraphs, n, p, q):
+    dir = "graphs/N{}_p_{}_q_{}_qq_{}".format(n, p, q, q)
+    chains = read_ensemble(dir,nshots,ngraphs)
+    json_file = open(fname,"r")
+    dict = json.load(json_file)
+    json_file.close()
+    n = str(n)
+    p = str(p)
+    q = str(q)
+    if n in dict.keys():
+        if p in dict[n].keys():
+            if q in dict[n][p].keys():
+                if 'chains' in dict[n][p][q].keys():
+                    dict[n][p][q]['chains'] = dict[n][p][q]['chains'] + chains
+                else:
+                    dict[n][p][q].update({'chains': chains})
+            else:
+                dict[n][p].update({q: {'chains': chains}})
+        else:
+            dict[n].update({p: {q: {'chains': chains}}})
+    else:
+        dict.update({n: {p: {q: {'chains': chains}}}})
+    json_file = open(fname, "w")
+    json.dump(dict, json_file)
+    json_file.close()
+
+def json_report(fname):
+    json_file = open(fname,"r")
+    dict = json.load(json_file)
+    json_file.close()
+    print()
+    print(fname)
+    print()
+    for x in sorted([int(key) for key in dict.keys()]):
+        n = str(x)
+        print("N = {}:".format(n))
+        for y in sorted([float(k) for k in dict[n].keys()]):
+            p = str(y)
+            print("  p = {}:".format(p))
+            for z in sorted([float(k) for k in dict[n][p].keys()]):
+                q = str(z)
+                print("    q = {}".format(q))
+                nchains = 0
+                if 'chains' in dict[n][p][q].keys():
+                    nchains = len(dict[n][p][q]['chains'])
+                print("      Number of chains: {}".format(nchains))
+                if 'chains' in dict[n][p][q].keys():
+                    chains = dict[n][p][q]['chains']
+                    lengths = set([len(x) for x in chains])
+                    for l in lengths:
+                        lcount = len([x for x in chains if len(x)==l])
+                        print("        L={}: {}".format(l,lcount))
+
+    print()
+    print()
+
+
+def chains_from_json(fname,n,p,q,L,strict=False):
+    json_file = open(fname,"r")
+    dict = json.load(json_file)
+    json_file.close()
+    n = str(n)
+    p = str(p)
+    q = str(q)
+    chains = dict[n][p][q]['chains']
+    if strict:
+        chains = [x for x in chains if len(x)==L]
+    else:
+        chains = [x for x in chains if len(x)>=L]
+        chains = [x[:L] for x in chains]
+
+    return(chains)
+
+def dmats_from_json(fname, metric, n, p, q, L, strict):
+    chains = chains_from_json(fname, n, p, q, L, strict)
+    dmats = [pairwise_distance_matrix(c, metric) for c in chains]
+    return dmats
+
+def chains_to_dmats_json(fin, fout, metric, metric_name):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    try:
+        json_file = open(fout,"r")
+        dict_out = json.load(json_file)
+        json_file.close()
+    except:
+        dict_out = {}
+    for n in dict_in.keys():
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                chains = dict_in[n][p][q]['chains']
+                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                if n in dict_out.keys():
+                    if p in dict_out[n].keys():
+                        if q in dict_out[n][p].keys():
+                            dict_out[n][p][q].update({metric_name: dmats})
+                        else:
+                            dict_out[n][p].update({q: {metric_name: dmats}})
+                    else:
+                        dict_out[n].update({p: {q: {metric_name: dmats}}})
+                else:
+                    dict_out.update({n: {p: {q: {metric_name: dmats}}}})
+    json_file = open(fout, "w")
+    json.dump(dict_out, json_file)
+    json_file.close()
+
+
+
+#########################
+# Main
+#########################
+
+
+# Stuff that will actually be done
+def main():
+    nshots = 200
+    num_vertices = int(sys.argv[1])
+    num_graphs = int(sys.argv[2])
+    p = float(sys.argv[3])
+    q = float(sys.argv[4])
+    qq = q
+
+    #update_json_with_chains("data.json",nshots,num_graphs,num_vertices,p,q)
+
+    #json_report("data.json")
+
+    #graphDir = "graphs"
+    #populate_folder(nshots, num_vertices, num_graphs, p, q, qq, graphDir)
+
+    chains = chains_from_json("data.json",num_vertices,p,q,num_graphs)
+    evalc, eval = evaluate_metric(chains, lambda x: order_by_metric_greedy(disagreementCount, x))
+    print()
+    print(evalc)
+    print()
+    print(eval)
+    print()
+
+    chains_to_dmats_json("data.json", "dmats.json", disagreementCount, "disagreementCount")
+
+    '''
+    graphDir = "graphs/N{}_p_{}_q_{}_qq_{}".format(num_vertices, p, q, qq)
+    run = "run10"
+    #evaluate_all(graphDir,200,20)
+
+    #metrics = [edgeCountDistance, disagreementCount, specDistance,minDistanceCUDA,meanDistanceCUDA,doublyStochasticMatrixDistance]
+    metrics = [doublyStochasticMatrixDistance, minDistanceCUDA, meanDistanceCUDA]
+    metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
+
+    for metric in metrics:
+        name = metricNames[metric]
+        print(name)
+        pairwise_distance_ensemble_parallel(graphDir, nshots, num_graphs, name)
+        print(name)
+        file_name = "{}/{}/{}.pkl".format(graphDir,run,name)
+        print()
+        dmat = unpickle(file_name)
+        print("Edges in dmat: {}".format(len(dmat)))
+        print()
+        order = order_from_distance_matrix(dmat, shuffle=False)
+        print("Order from {} from distance matrix: {}\n".format(name, order))
+        #graphs = read_chain("{}/{}".format(graphDir,run), num_graphs)
+        #order = order_by_metric_greedy(metric, graphs, shuffle=False)
+        #print("Order from {} without distance matrix: {}\n".format(name, order))
+
+    #graphs = graphChain(num_vertices, num_graphs, p, q, qq, verbose=False, to_file=False, fileNameRoot="graphs/graph")
+    print()
+    #print(pairwise_distances_from_folder(graphDir, 100, edgeCountDistance, True, "edgeCountDistance"))
+    print()
+    '''
+
+    '''
+    print()
+
+    perm = order_by_edge_counts(graphs)
+    print(perm)
+    print()
+
+    #start = time.time()
+
+    perm = order_by_metric_greedy_cached(minDistanceCUDA, graphs)
+    print(perm)
+    print()
+
+    #end = time.time()
+
+    #print("Ordering took {} seconds without caching\n".format(start-end))
+
+    #start = time.time()
+
+    perm = order_by_metric_greedy_cached(specDistance, graphs)
+    print(perm)
+    print()
+    '''
+
+    #end = time.time()
+
+    #print("Ordering took {} seconds with caching\n".format(start-end))
+
+    #perm = order_by_metric_greedy(doublyStochasticMatrixDistance, graphs)
+    #print(perm)
+    #print()
+
+
+    '''
+    graph1 = read_file("graphs/N10_p_0.3_q_0.1_qq_0.1/run3/graph22.txt")
+    graph2 = read_file("graphs/N10_p_0.3_q_0.1_qq_0.1/run3/graph47.txt")
+
+    d = meanDistanceCUDA(graph1,graph2)
+    print(d)
+    '''
+
+
+    #for graph in graphs:
+    #    visualizeGraph(graph)
+
+# Do stuff
+if __name__ == '__main__':
+    main()
