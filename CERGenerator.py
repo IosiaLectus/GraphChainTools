@@ -552,16 +552,24 @@ def json_report(fname):
             for z in sorted([float(k) for k in dict[n][p].keys()]):
                 q = str(z)
                 print("    q = {}".format(q))
-                nchains = 0
-                if 'chains' in dict[n][p][q].keys():
-                    nchains = len(dict[n][p][q]['chains'])
-                print("      Number of chains: {}".format(nchains))
                 if 'chains' in dict[n][p][q].keys():
                     chains = dict[n][p][q]['chains']
+                    nchains = len(chains)
+                    print("      Number of chains: {}".format(nchains))
                     lengths = set([len(x) for x in chains])
                     for l in lengths:
                         lcount = len([x for x in chains if len(x)==l])
                         print("        L={}: {}".format(l,lcount))
+                else:
+                    for metric in dict[n][p][q].keys():
+                        print("      {}:".format(metric))
+                        dmats = dict[n][p][q][metric]
+                        ndmats = len(dmats)
+                        print("        Number of distance matrices: {}".format(ndmats))
+                        lengths = set([len(x) for x in  dmats])
+                        for l in lengths:
+                            lcount = len([x for x in dmats if len(x)==l])
+                            print("          L={}: {}".format(l,lcount))
 
     print()
     print()
@@ -598,9 +606,46 @@ def chains_to_dmats_json(fin, fout, metric, metric_name):
         json_file.close()
     except:
         dict_out = {}
-    for n in dict_in.keys():
+    nlist = [n for n in dict_in.keys() if int(n)<30]
+    for n in nlist:
         for p in dict_in[n].keys():
             for q in dict_in[n][p].keys():
+                chains = dict_in[n][p][q]['chains']
+                if n in dict_out.keys():
+                    if p in dict_out[n].keys():
+                        if q in dict_out[n][p].keys():
+                            if not metric_name in dict_out[n][p][q].keys():
+                                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                                dict_out[n][p][q].update({metric_name: dmats})
+                        else:
+                            dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                            dict_out[n][p].update({q: {metric_name: dmats}})
+                    else:
+                        dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                        dict_out[n].update({p: {q: {metric_name: dmats}}})
+                else:
+                    dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                    dict_out.update({n: {p: {q: {metric_name: dmats}}}})
+    json_file = open(fout, "w")
+    json.dump(dict_out, json_file)
+    json_file.close()
+
+def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    try:
+        json_file = open(fout,"r")
+        dict_out = json.load(json_file)
+        json_file.close()
+    except:
+        dict_out = {}
+    n = str(n)
+    p = str(p)
+    q = str(q)
+    if n in dict_in.keys():
+        if p in dict_in[n].keys():
+            if  q in dict_in[n][p].keys():
                 chains = dict_in[n][p][q]['chains']
                 dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
                 if n in dict_out.keys():
@@ -613,6 +658,15 @@ def chains_to_dmats_json(fin, fout, metric, metric_name):
                         dict_out[n].update({p: {q: {metric_name: dmats}}})
                 else:
                     dict_out.update({n: {p: {q: {metric_name: dmats}}}})
+            else:
+                print("q not found")
+                return
+        else:
+            print("p not foundt")
+            return
+    else:
+        print("n not found")
+        return
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
     json_file.close()
@@ -635,11 +689,14 @@ def main():
 
     #update_json_with_chains("data.json",nshots,num_graphs,num_vertices,p,q)
 
+    chains_to_dmats_json_partial("data.json", "dmats.json", minDistance, "minDistance", num_vertices, p, q)
+
     #json_report("data.json")
+    json_report("dmats.json")
 
     #graphDir = "graphs"
     #populate_folder(nshots, num_vertices, num_graphs, p, q, qq, graphDir)
-
+    '''
     chains = chains_from_json("data.json",num_vertices,p,q,num_graphs)
     evalc, eval = evaluate_metric(chains, lambda x: order_by_metric_greedy(disagreementCount, x))
     print()
@@ -649,7 +706,7 @@ def main():
     print()
 
     chains_to_dmats_json("data.json", "dmats.json", disagreementCount, "disagreementCount")
-
+    '''
     '''
     graphDir = "graphs/N{}_p_{}_q_{}_qq_{}".format(num_vertices, p, q, qq)
     run = "run10"
