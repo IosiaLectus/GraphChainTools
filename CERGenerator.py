@@ -340,6 +340,26 @@ def order_from_distance_matrix(dmat, shuffle=False):
         ordered.append(graphsLeft.pop(indexMin))
     return ordered
 
+def order_from_distance_matrix_list(dmat, shuffle=False):
+    ngraphs = len(dmat)
+    graphsLeft = [i for i in range(1,ngraphs)]
+    graphsLeft.reverse()
+    if shuffle:
+        random.shuffle(graphsLeft)
+    ordered = [0]
+    while len(graphsLeft)>0:
+        indexMin = 0
+        bestPair = [ordered[-1],graphsLeft[indexMin]]
+        currentBestLen = dmat[bestPair[0]][bestPair[1]]
+        for i in range(1,len(graphsLeft)):
+            thisPair = [ordered[-1],graphsLeft[i]]
+            thisLen = dmat[thisPair[0]][thisPair[1]]
+            if currentBestLen > thisLen:
+                indexMin = i
+                currentBestLen = thisLen
+        ordered.append(graphsLeft.pop(indexMin))
+    return ordered
+
 
 def populate_folder(nshots, nvertices, ngraphs, p, q, qq, dir):
     subdir = "N{}_p_{}_q_{}_qq_{}".format(nvertices,p,q,qq)
@@ -422,10 +442,7 @@ def pairwise_distance_ensemble_parallel(dir, nshots, ngraphs, metric_name):
         path = "{}/{}".format(dir,folder)
         os.system("python3 CERParallel.py {} {} {}".format(ngraphs, metric_name, path))
 
-
-
-def evaluate_metric(chains, orderFun):
-    perms = [orderFun(chain) for chain in chains]
+def evaluate_perms(perms):
     total_number = len(perms)
     if len(perms)<1:
         return []
@@ -440,6 +457,20 @@ def evaluate_metric(chains, orderFun):
         correct_count = len(correct_perms)
         correct_to_index.append(correct_count/total_number)
     return correct_to_index, correct_at_index
+
+
+
+def evaluate_metric(chains, orderFun):
+    perms = [orderFun(chain) for chain in chains]
+    return evaluate_perms(perms)
+
+def evaluate_metric_from_dmats_list(dmats):
+    perms = [order_from_distance_matrix_list(dmat) for dmat in dmats]
+    return evaluate_perms(perms)
+
+def evaluate_metric_from_dmats_dict(dmats):
+    perms = [order_from_distance_matrix(dmat) for dmat in dmats]
+    return evaluate_perms(perms)
 
 def evaluate_all(dir,nshots,chain_length):
 
@@ -671,6 +702,43 @@ def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q):
     json.dump(dict_out, json_file)
     json_file.close()
 
+def dmats_to_greedy_evals(fin,fout):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    try:
+        json_file = open(fout,"r")
+        dict_out = json.load(json_file)
+        json_file.close()
+    except:
+        dict_out = {}
+    nlist = [n for n in dict_in.keys() if int(n)<30]
+    for n in nlist:
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                for metric in dict_in[n][p][q].keys():
+                    dmats =dict_in[n][p][q][metric]
+                    evalc_name = "correct to i for {} greedy".format(metric)
+                    eval_name = "correct at i for {} greedy".format(metric)
+                    if n in dict_out.keys():
+                        if p in dict_out[n].keys():
+                            if q in dict_out[n][p].keys():
+                                if not eval_name in dict_out[n][p][q].keys():
+                                    eval = evaluate_metric_from_dmats_list(dmats)
+                                    dict_out[n][p][q].update({eval_name: eval})
+                                if not evalc_name in dict_out[n][p][q].keys():
+                                    evalc = evaluate_metric_from_dmats_list(dmats)
+                                    dict_out[n][p][q].update({evalc_name: evalc})
+                            else:
+                                evalc, eval = evaluate_metric_from_dmats_list(dmats)
+                                dict_out[n][p].update({q: {evalc_name: evalc, eval_name: eval}})
+                        else:
+                            evalc, eval = evaluate_metric_from_dmats_list(dmats)
+                            dict_out[n].update({p: {q: {evalc_name: evalc, eval_name: eval}}})
+                    else:
+                        evalc, eval = evaluate_metric_from_dmats_list(dmats)
+                        dict_out.update({n: {p: {q: {evalc_name: evalc, eval_name: eval}}}})
+
 
 
 #########################
@@ -689,10 +757,10 @@ def main():
 
     #update_json_with_chains("data.json",nshots,num_graphs,num_vertices,p,q)
 
-    chains_to_dmats_json_partial("data.json", "dmats.json", minDistance, "minDistance", num_vertices, p, q)
+    dmats_to_greedy_evals("dmats.json", "scores.json")
 
     #json_report("data.json")
-    json_report("dmats.json")
+    json_report("scores.json")
 
     #graphDir = "graphs"
     #populate_folder(nshots, num_vertices, num_graphs, p, q, qq, graphDir)
