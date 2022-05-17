@@ -738,6 +738,9 @@ def dmats_to_greedy_evals(fin,fout):
                     else:
                         evalc, eval = evaluate_metric_from_dmats_list(dmats)
                         dict_out.update({n: {p: {q: {evalc_name: evalc, eval_name: eval}}}})
+    json_file = open(fout, "w")
+    json.dump(dict_out, json_file)
+    json_file.close()
 
 
 
