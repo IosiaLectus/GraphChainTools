@@ -4,7 +4,7 @@ import numpy as np
 from functools import reduce
 from matplotlib import pyplot as plt
 from itertools import permutations
-import cvxpy as cy
+#import cvxpy as cy
 
 #######################################
 # Throughout most of this document,
@@ -74,7 +74,7 @@ def specDistance(graphA, graphB):
     lamB.sort()
     distList = list(lamA-lamB)
     return float(np.sqrt(sum([x**2 for x in distList])))
-
+'''
 def doublyStochasticMatrixDistance(graphA, graphB):
     nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
     if len(nodeVals)==0:
@@ -91,7 +91,7 @@ def doublyStochasticMatrixDistance(graphA, graphB):
     # solve problem:
     p.solve(solver='SCS', verbose= False)
     return obj.value
-
+'''
 
 def disagreementCount(graphA, graphB):
     diffs = [e for e in graphA if not e in graphB] + [e for e in graphB if not e in graphA]
@@ -516,7 +516,7 @@ def evaluate_all(dir,nshots,chain_length):
 # documenmts
 ###########################
 
-def update_json_with_chains(fname, nshots, ngraphs, n, p, q):
+def update_json_with_chains(fname, nshots, ngraphs, n, p, q, skip=False):
     chains = [graphChain(n, ngraphs, p, q, q) for i in range(nshots)]
     json_file = open(fname,"r")
     dict = json.load(json_file)
@@ -528,7 +528,8 @@ def update_json_with_chains(fname, nshots, ngraphs, n, p, q):
         if p in dict[n].keys():
             if q in dict[n][p].keys():
                 if 'chains' in dict[n][p][q].keys():
-                    dict[n][p][q]['chains'] = dict[n][p][q]['chains'] + chains
+                    if not skip:
+                        dict[n][p][q]['chains'] = dict[n][p][q]['chains'] + chains
                 else:
                     dict[n][p][q].update({'chains': chains})
             else:
@@ -595,12 +596,21 @@ def json_report(fname):
                     for metric in dict[n][p][q].keys():
                         print("      {}:".format(metric))
                         dmats = dict[n][p][q][metric]
-                        ndmats = len(dmats)
-                        print("        Number of distance matrices: {}".format(ndmats))
-                        lengths = set([len(x) for x in  dmats])
-                        for l in lengths:
-                            lcount = len([x for x in dmats if len(x)==l])
-                            print("          L={}: {}".format(l,lcount))
+                        print("        {}".format(dmats))
+                    '''
+                    for metric in dict[n][p][q].keys():
+                        print("      {}:".format(metric))
+                        dmats = dict[n][p][q][metric]
+                        try:
+                            lengths = set([len(x) for x in  dmats if x>3])
+                            ndmats = len(dmats)
+                            print("        Number of distance matrices: {}".format(ndmats))
+                            for l in lengths:
+                                lcount = len([x for x in dmats if len(x)==l])
+                                print("          L={}: {}".format(l,lcount))
+                        except:
+                            print("        {}".format(dmats))
+                    '''
 
     print()
     print()
@@ -724,10 +734,10 @@ def dmats_to_greedy_evals(fin,fout):
                         if p in dict_out[n].keys():
                             if q in dict_out[n][p].keys():
                                 if not eval_name in dict_out[n][p][q].keys():
-                                    eval = evaluate_metric_from_dmats_list(dmats)
+                                    eval = evaluate_metric_from_dmats_list(dmats)[1]
                                     dict_out[n][p][q].update({eval_name: eval})
                                 if not evalc_name in dict_out[n][p][q].keys():
-                                    evalc = evaluate_metric_from_dmats_list(dmats)
+                                    evalc = evaluate_metric_from_dmats_list(dmats)[0]
                                     dict_out[n][p][q].update({evalc_name: evalc})
                             else:
                                 evalc, eval = evaluate_metric_from_dmats_list(dmats)
@@ -751,108 +761,41 @@ def dmats_to_greedy_evals(fin,fout):
 
 # Stuff that will actually be done
 def main():
+    '''
     nshots = 200
     num_vertices = int(sys.argv[1])
     num_graphs = int(sys.argv[2])
     p = float(sys.argv[3])
     q = float(sys.argv[4])
     qq = q
+    '''
+
+    nshots = 200
+    nvertices = 12
+    ngraphs = 100
+    plist = [0.05,0.1,0.2,0.3,0.4,0.5]
+    qlist = [0.01,0.05,0.1,0.2,0.3]
+
+    json_report("data.json")
+    
+    for p in plist:
+        for q in qlist:
+            update_json_with_chains('data.json',nshots,ngraphs,nvertices,p,q,skip=True)
+            print("p={}, q={} finished".format(p,q))
+
+    json_report("data.json")
 
     #update_json_with_chains("data.json",nshots,num_graphs,num_vertices,p,q)
 
-    dmats_to_greedy_evals("dmats.json", "scores.json")
+    #dmats_to_greedy_evals("dmats.json", "scores.json")
 
     #json_report("data.json")
-    json_report("scores.json")
-
-    #graphDir = "graphs"
-    #populate_folder(nshots, num_vertices, num_graphs, p, q, qq, graphDir)
-    '''
-    chains = chains_from_json("data.json",num_vertices,p,q,num_graphs)
-    evalc, eval = evaluate_metric(chains, lambda x: order_by_metric_greedy(disagreementCount, x))
-    print()
-    print(evalc)
-    print()
-    print(eval)
-    print()
-
-    chains_to_dmats_json("data.json", "dmats.json", disagreementCount, "disagreementCount")
-    '''
-    '''
-    graphDir = "graphs/N{}_p_{}_q_{}_qq_{}".format(num_vertices, p, q, qq)
-    run = "run10"
-    #evaluate_all(graphDir,200,20)
+    #json_report("scores.json")
 
     #metrics = [edgeCountDistance, disagreementCount, specDistance,minDistanceCUDA,meanDistanceCUDA,doublyStochasticMatrixDistance]
-    metrics = [doublyStochasticMatrixDistance, minDistanceCUDA, meanDistanceCUDA]
-    metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
+    #metrics = [doublyStochasticMatrixDistance, minDistanceCUDA, meanDistanceCUDA]
+    #metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
 
-    for metric in metrics:
-        name = metricNames[metric]
-        print(name)
-        pairwise_distance_ensemble_parallel(graphDir, nshots, num_graphs, name)
-        print(name)
-        file_name = "{}/{}/{}.pkl".format(graphDir,run,name)
-        print()
-        dmat = unpickle(file_name)
-        print("Edges in dmat: {}".format(len(dmat)))
-        print()
-        order = order_from_distance_matrix(dmat, shuffle=False)
-        print("Order from {} from distance matrix: {}\n".format(name, order))
-        #graphs = read_chain("{}/{}".format(graphDir,run), num_graphs)
-        #order = order_by_metric_greedy(metric, graphs, shuffle=False)
-        #print("Order from {} without distance matrix: {}\n".format(name, order))
-
-    #graphs = graphChain(num_vertices, num_graphs, p, q, qq, verbose=False, to_file=False, fileNameRoot="graphs/graph")
-    print()
-    #print(pairwise_distances_from_folder(graphDir, 100, edgeCountDistance, True, "edgeCountDistance"))
-    print()
-    '''
-
-    '''
-    print()
-
-    perm = order_by_edge_counts(graphs)
-    print(perm)
-    print()
-
-    #start = time.time()
-
-    perm = order_by_metric_greedy_cached(minDistanceCUDA, graphs)
-    print(perm)
-    print()
-
-    #end = time.time()
-
-    #print("Ordering took {} seconds without caching\n".format(start-end))
-
-    #start = time.time()
-
-    perm = order_by_metric_greedy_cached(specDistance, graphs)
-    print(perm)
-    print()
-    '''
-
-    #end = time.time()
-
-    #print("Ordering took {} seconds with caching\n".format(start-end))
-
-    #perm = order_by_metric_greedy(doublyStochasticMatrixDistance, graphs)
-    #print(perm)
-    #print()
-
-
-    '''
-    graph1 = read_file("graphs/N10_p_0.3_q_0.1_qq_0.1/run3/graph22.txt")
-    graph2 = read_file("graphs/N10_p_0.3_q_0.1_qq_0.1/run3/graph47.txt")
-
-    d = meanDistanceCUDA(graph1,graph2)
-    print(d)
-    '''
-
-
-    #for graph in graphs:
-    #    visualizeGraph(graph)
 
 # Do stuff
 if __name__ == '__main__':
