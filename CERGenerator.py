@@ -788,7 +788,10 @@ def main():
 
     chains_to_dmats_json("data.json", "dmats.json", doublyStochasticMatrixDistance, "doublyStochasticMatrixDistance")
     '''
-    json_report("dmats.json")
+
+    dmats_to_greedy_evals("dmats.json","score.json")
+
+    json_report("score.json")
     
     #update_json_with_chains("data.json",nshots,num_graphs,num_vertices,p,q)
 
