@@ -712,6 +712,7 @@ def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q):
     json.dump(dict_out, json_file)
     json_file.close()
 
+
 def dmats_to_greedy_evals(fin,fout):
     json_file = open(fin,"r")
     dict_in = json.load(json_file)
@@ -752,6 +753,40 @@ def dmats_to_greedy_evals(fin,fout):
     json.dump(dict_out, json_file)
     json_file.close()
 
+def chains_to_edge_counts(fin,fout):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    try:
+        json_file = open(fout,"r")
+        dict_out = json.load(json_file)
+        json_file.close()
+    except:
+        dict_out = {}
+    nlist = [n for n in dict_in.keys() if int(n)<30]
+    for n in nlist:
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                chains = dict_in[n][p][q]['chains']
+                if n in dict_out.keys():
+                    if p in dict_out[n].keys():
+                        if q in dict_out[n][p].keys():
+                            if not "edge counts" in dict_out[n][p][q].keys():
+                                edge_counts = [len(c) for c in chains]
+                                dict_out[n][p][q].update({"edge counts": edge_counts})
+                        else:
+                            edge_counts = [len(c) for c in chains]
+                            dict_out[n][p].update({q: {"edge counts": edge_counts}})
+                    else:
+                        edge_counts = [len(c) for c in chains]
+                        dict_out[n].update({p: {q: {"edge counts": edge_counts}}})
+                else:
+                    edge_counts = [len(c) for c in chains]
+                    dict_out.update({n: {p: {q: {"edge counts": edge_counts}}}})
+    json_file = open(fout, "w")
+    json.dump(dict_out, json_file)
+    json_file.close()
+
 
 
 #########################
@@ -777,7 +812,7 @@ def main():
     qlist = [0.01,0.05,0.1,0.2,0.3]
 
     json_report("data.json")
-    
+
     for p in plist:
         for q in qlist:
             update_json_with_chains('data.json',nshots,ngraphs,nvertices,p,q,skip=True)
