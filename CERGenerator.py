@@ -4,7 +4,7 @@ import numpy as np
 from functools import reduce
 from matplotlib import pyplot as plt
 from itertools import permutations
-#import cvxpy as cy
+import cvxpy as cy
 
 #######################################
 # Throughout most of this document,
@@ -74,7 +74,7 @@ def specDistance(graphA, graphB):
     lamB.sort()
     distList = list(lamA-lamB)
     return float(np.sqrt(sum([x**2 for x in distList])))
-'''
+
 def doublyStochasticMatrixDistance(graphA, graphB):
     nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
     if len(nodeVals)==0:
@@ -91,7 +91,7 @@ def doublyStochasticMatrixDistance(graphA, graphB):
     # solve problem:
     p.solve(solver='SCS', verbose= False)
     return obj.value
-'''
+
 
 def disagreementCount(graphA, graphB):
     diffs = [e for e in graphA if not e in graphB] + [e for e in graphB if not e in graphA]
@@ -777,14 +777,19 @@ def main():
     qlist = [0.01,0.05,0.1,0.2,0.3]
 
     json_report("data.json")
-    
+    ''' 
     for p in plist:
         for q in qlist:
             update_json_with_chains('data.json',nshots,ngraphs,nvertices,p,q,skip=True)
             print("p={}, q={} finished".format(p,q))
 
     json_report("data.json")
+    
 
+    chains_to_dmats_json("data.json", "dmats.json", doublyStochasticMatrixDistance, "doublyStochasticMatrixDistance")
+    '''
+    json_report("dmats.json")
+    
     #update_json_with_chains("data.json",nshots,num_graphs,num_vertices,p,q)
 
     #dmats_to_greedy_evals("dmats.json", "scores.json")
