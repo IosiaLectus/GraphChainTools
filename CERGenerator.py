@@ -647,7 +647,7 @@ def chains_to_dmats_json(fin, fout, metric, metric_name):
         json_file.close()
     except:
         dict_out = {}
-    nlist = [n for n in dict_in.keys() if int(n)<30]
+    nlist = [n for n in dict_in.keys() if int(n)<15]
     for n in nlist:
         for p in dict_in[n].keys():
             for q in dict_in[n][p].keys():
@@ -784,12 +784,12 @@ def main():
             print("p={}, q={} finished".format(p,q))
 
     json_report("data.json")
-    
-
-    chains_to_dmats_json("data.json", "dmats.json", doublyStochasticMatrixDistance, "doublyStochasticMatrixDistance")
     '''
 
-    dmats_to_greedy_evals("dmats.json","score.json")
+    chains_to_dmats_json("data.json", "dmats.json", minDistanceCUDA, "minDistanceCUDA")
+    
+
+    # dmats_to_greedy_evals("dmats.json","score.json")
 
     json_report("score.json")
     
