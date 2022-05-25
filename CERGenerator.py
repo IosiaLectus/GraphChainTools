@@ -4,7 +4,10 @@ import numpy as np
 from functools import reduce
 from matplotlib import pyplot as plt
 from itertools import permutations
-import cvxpy as cy
+try:
+    import cvxpy as cy
+except:
+    print("\ncvxpy not found\n")
 
 #######################################
 # Throughout most of this document,
@@ -595,8 +598,8 @@ def json_report(fname):
                 else:
                     for metric in dict[n][p][q].keys():
                         print("      {}:".format(metric))
-                        dmats = dict[n][p][q][metric]
-                        print("        {}".format(dmats))
+                        #dmats = dict[n][p][q][metric]
+                        #print("        {}".format(dmats))
                     '''
                     for metric in dict[n][p][q].keys():
                         print("      {}:".format(metric))
@@ -647,7 +650,7 @@ def chains_to_dmats_json(fin, fout, metric, metric_name):
         json_file.close()
     except:
         dict_out = {}
-    nlist = [n for n in dict_in.keys() if int(n)<30]
+    nlist = [n for n in dict_in.keys() if int(n)<15]
     for n in nlist:
         for p in dict_in[n].keys():
             for q in dict_in[n][p].keys():
@@ -787,6 +790,41 @@ def chains_to_edge_counts(fin,fout):
     json.dump(dict_out, json_file)
     json_file.close()
 
+def chains_to_edge_count_scores(fin, fout):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    try:
+        json_file = open(fout,"r")
+        dict_out = json.load(json_file)
+        json_file.close()
+    except:
+        dict_out = {}
+    nlist = [n for n in dict_in.keys() if int(n)<30]
+    for n in nlist:
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                chains = dict_in[n][p][q]['chains']
+                evalc,eval = evaluate_metric(chains, order_by_edge_counts)
+                evalc_name = "correct to i for edge count order".format(metric)
+                eval_name = "correct at i for edge count order".format(metric)
+                if n in dict_out.keys():
+                    if p in dict_out[n].keys():
+                        if q in dict_out[n][p].keys():
+                            if not evalc_name in dict_out[n][p][q].keys():
+                                dict_out[n][p][q].update(evalc_name: evalc})
+                            if not eval_name in dict_out[n][p][q].keys():
+                                dict_out[n][p][q].update(eval_name: eval})
+                        else:
+                            dict_out[n][p].update({q: {evalc_name: evalc, eval_name: eval}})
+                    else:
+                        dict_out[n].update({p: {q: {evalc_name: evalc, eval_name: eval}}})
+                else:
+                    dict_out.update({n: {p: {q: {evalc_name: evalc, eval_name: eval}}}})
+    json_file = open(fout, "w")
+    json.dump(dict_out, json_file)
+    json_file.close()
+
 
 
 #########################
@@ -811,7 +849,7 @@ def main():
     plist = [0.05,0.1,0.2,0.3,0.4,0.5]
     qlist = [0.01,0.05,0.1,0.2,0.3]
 
-    json_report("data.json")
+    #json_report("data.json")
     '''
     for p in plist:
         for q in qlist:
@@ -821,12 +859,14 @@ def main():
     json_report("data.json")
 
 
-    chains_to_dmats_json("data.json", "dmats.json", doublyStochasticMatrixDistance, "doublyStochasticMatrixDistance")
+    chains_to_dmats_json("data.json", "dmats.json", minDistanceCUDA, "minDistanceCUDA")
     '''
 
-    dmats_to_greedy_evals("dmats.json","score.json")
+    json_report("dmats.json")
 
-    json_report("score.json")
+    chains_to_edge_count_scores("data.json","scores.json")
+
+    json_report("scores.json")
 
     #update_json_with_chains("data.json",nshots,num_graphs,num_vertices,p,q)
 
