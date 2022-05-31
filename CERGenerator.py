@@ -454,7 +454,7 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None, parallel=Fa
     distances = {}
     if parallel:
         graphStrings = [graphListToString(g) for g in graphs]
-        pairs = [(i,j) for i in range(j) for j in range(L)]
+        pairs = [(i,j) for j in range(L) for i in range(j)]
         my_func = lambda x: (x[0], x[1], metric(x[0],x[1]))
         pool = Pool(NUM_CPUS)
         results = pool.map(my_func, pairs)
