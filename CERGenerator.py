@@ -205,6 +205,30 @@ def meanDistanceCUDA(graphA, graphB):
     outputLines = [line for line in outputLines if 'GPU Mean' in line]
     return float(outputLines[0].split()[-1])
 
+def minAndMeanDistCUDA(graphA, graphB):
+    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
+    if len(nodeVals)==0:
+        nvertices = 0
+        return 0
+    nvertices = max(nodeVals)
+    fileA ="graphs/tempA.txt"
+    fileB ="graphs/tempB.txt"
+    outputFile = "graphs/tempOut.txt"
+    outputFile2 = "graphs/tempOut2.txt"
+    graphToFile(graphA, fileA)
+    graphToFile(graphB, fileB)
+    os.system("rm {}".format(outputFile))
+    os.system("rm {}".format(outputFile2))
+    os.system("./bruteforce {} {} {} 1 0 0 {} >> {}".format(fileA, fileB, outputFile, nvertices, outputFile2))
+    file = open(outputFile2,'r')
+    output = file.read()
+    outputLines = output.split('\n')
+    outputLines1 = [line for line in outputLines if 'GPU Opt' in line]
+    outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
+    minDist = float(outputLines1[0].split()[-1])
+    meanDist = float(outputLines2[0].split()[-1])
+    return minDist, meanDist
+
 
 #########################
 # Generate random graphs
@@ -426,7 +450,7 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None,parallel=Fal
             if parallel:
                 metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
                 name = metricNames[metric]
-                d=int(bytes(subprocess.check_output(["python3", "CERDMATParallel.py",name,graphStrings[i],graphString[j]])).decode('utf-8').split()[0])
+                d=int(bytes(subprocess.check_output(["python3", "CERDMATParallel.py",name,graphStrings[i],graphStrings[j]])).decode('utf-8').split()[0])
             else:
                 d = metric(graphs[i],graphs[j])
             distances.update({(i,j): d})
