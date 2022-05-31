@@ -4,10 +4,15 @@ import numpy as np
 from functools import reduce
 from matplotlib import pyplot as plt
 from itertools import permutations
+from multiprocessing.dummy import Pool
+from multiprocessing import cpu_count
 try:
     import cvxpy as cy
 except:
     print("\ncvxpy not found\n")
+
+
+NUM_CPUS = cpu_count()
 
 #######################################
 # Throughout most of this document,
@@ -444,20 +449,28 @@ def unpickle(filename):
     f.close()
     return d
 
-def pairwise_distance_matrix(graphs,metric,to_file=False, file=None,parallel=False):
+def pairwise_distance_matrix(graphs,metric,to_file=False, file=None, parallel=False):
     L = len(graphs)
     distances = {}
     if parallel:
         graphStrings = [graphListToString(g) for g in graphs]
-    for j in range(L):
-        for i in range(j):
-            if parallel:
-                metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
-                name = metricNames[metric]
-                d=float(bytes(subprocess.check_output(["python3", "CERDMatParallel.py",name,graphStrings[i],graphStrings[j]])).decode('utf-8').split()[0])
-            else:
+        pairs = [(i,j) for i in range(j) for j in range(L)]
+        my_func = lambda x: (x[0], x[1], metric(x[0],x[1]))
+        pool = Pool(NUM_CPUS)
+        results = pool.map(my_func, pairs)
+        distances = {(x[0], x[1]): x[2] for x in results}
+    else:
+        for j in range(L):
+            for i in range(j):
+                '''
+                if parallel:
+                    metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
+                    name = metricNames[metric]
+                    d=float(bytes(subprocess.check_output(["python3", "CERDMatParallel.py",name,graphStrings[i],graphStrings[j]])).decode('utf-8').split()[0])
+                else:
+                '''
                 d = metric(graphs[i],graphs[j])
-            distances.update({(i,j): d})
+                distances.update({(i,j): d})
     if to_file:
         outp = open(file,'wb')
         pickle.dump(distances, outp, -1)
