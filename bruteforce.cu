@@ -109,53 +109,53 @@ __host__ __device__ void printfloatvec(float *v, int n){
 // the norm we are computing is min_P || A - P^T B P ||
 // we will also return the best permutation
 void compute_optimal_match(int n, float *A, float *B, float (*metric)(int , float* , float *, int* ), int * bestperm , float* opt_val_out, float* mean_val_out){
-    
+
     float opt_val = FLT_MAX;
     double mean_val = 0;
-    double count_perms = 0;    
+    double count_perms = 0;
 
     int * v = (int *) malloc(n * sizeof(int) );
     int * output = (int *) malloc(n * sizeof(int) );
-    
+
     settoconsec(v, n);
-    
+
     while( v[n-1] <= n ){
-        
+
         // note that the way we are going the swap here is a bit different because
         // the elements from v are already in increasing form. Like
         // 1 2 3 , 2 2 3  , 3 2 3, 1 3 3 , 2 3 3 , 3 3 3
         // while in the parallel code the v is in the form
         // 1 1 1 , 2 1 1, 3 1 1, 1 2 1, 2 2 1 , 3 2 1
-        
+
         settoconsec(output, n);
         for( int i = 0; i < n ; i++){
             swap(output, i, v[i]-1);
         }
-        
+
         // at this point the vector output contains a permutation and we can compute a distance
         float val = (*metric)( n , A , B , output );
 	mean_val = mean_val + val;
-	count_perms++;        
+	count_perms++;
 
 	if ( val < opt_val ){
             opt_val = val;
             copyvec( bestperm , output , n );
         }
-        
+
         v[ 0 ] = v[ 0 ] + 1;
         for (int  i = 0; i < n-1 ; i++){
             if( v[i] > n ){
-                v[i] = i+1; 
+                v[i] = i+1;
                 v[ i + 1 ] = v[ i + 1 ] + 1;
             }
         }
-        
+
     }
-    
+
     free(output);
     free(v);
-    
-    *opt_val_out = opt_val; 
+
+    *opt_val_out = opt_val;
     *mean_val_out = mean_val / count_perms;
 
     return;
@@ -168,7 +168,7 @@ void compute_optimal_match(int n, float *A, float *B, float (*metric)(int , floa
 // this function transforms and index into a permutation
 // the function requires a bit of scrap space
 __device__ __host__ void index_to_perm(lint r, int n, int *perm, int * scrap){
-    
+
     for (int i = n ; i >=1; i--){
         scrap[n - i] =   (r % i) + 1;
         r = r/i;
@@ -180,13 +180,13 @@ __device__ __host__ void index_to_perm(lint r, int n, int *perm, int * scrap){
     // 1 1 1 , 2 1 1, 3 1 1, 1 2 1, 2 2 1 , 3 2 1
     // but in the serial code it is
     // 1 2 3 , 2 2 3  , 3 2 3, 1 3 3 , 2 3 3 , 3 3 3
-    
-    
+
+
     settoconsec(perm, n);
     for( int i = 0; i < n ; i++){
         swap(perm, i, i + scrap[i]-1);
     }
-    
+
 }
 
 inline int fact(int n){
@@ -201,10 +201,10 @@ inline int fact(int n){
 // we cannot store the result of all evaluations in memory and then do a parallel max.
 // there is just too much stuff to try. So each thread needs to keep a local max of several trials
 __global__ void kernel_to_compute_optimal_match(int chunck_per_cycle, int num_perm_per_thread, lint nfact, int n, float *A, float *B, float (*metric)(int , float* , float *, int* ), float * obj_vals, lint * obj_perms , double * local_sums, int *local_num_perms ){
-    
+
     int baseix = blockIdx.x*blockDim.x + threadIdx.x;;
     lint ix = baseix;
-    
+
     // we copy A and B to shared memory because it might be faster when we are computing the norms
     extern __shared__ float AB_shared_mem[];
     // we need to split the shared memory into different parts
@@ -218,7 +218,7 @@ __global__ void kernel_to_compute_optimal_match(int chunck_per_cycle, int num_pe
         }
     }
     __syncthreads();
-    
+
     float best_val = FLT_MAX;
     double local_sum = 0.0;
     int local_count = 0;
@@ -245,22 +245,22 @@ __global__ void kernel_to_compute_optimal_match(int chunck_per_cycle, int num_pe
 
         }
     }
-    
+
     obj_vals[baseix] = best_val;
     obj_perms[baseix] = best_perm_ix;
     local_sums[baseix] = local_sum;
     local_num_perms[baseix] = local_count;
-    
+
 }
 
 
 void test_index_perm(int n ){
 
     // test the function that indexes permutations sequentially
-    
+
     int *perm  = (int *) malloc(n * sizeof(int));
     int *scrap = (int *) malloc(n * sizeof(int));
-    
+
     for (int r = 0; r < fact(n) ; r++){
         index_to_perm(r, n, perm, scrap);
         //printvec(perm,n);
@@ -274,14 +274,14 @@ void test_index_perm(int n ){
 
 // this function will allocate space for A
 float * read_graph_into_adj_mat(char * filename, int *graphsize, int directed){
-    
+
     // if we are not given the graph size then we first read the file to try to estimate the size
     // of the graph by trying to find the largest index used
     // here we assume that the indices used are 1, 2, ..., n
     if (*graphsize == -1){
         FILE *  graphfile = fopen(filename , "r");
-        
-        
+
+
         int dim = -1;
         int edge1, edge2;
         while (   fscanf(graphfile, "%d %d\n", &edge1, &edge2) != EOF){
@@ -294,21 +294,21 @@ float * read_graph_into_adj_mat(char * filename, int *graphsize, int directed){
         }
         fclose(graphfile);
         *graphsize = dim;
-        
+
     }
-    
+
     // we use calloc because we want most of the entries to be zero and just have to set a few to non-zero
     // whatever edges are not specified in the file we are reading we will assume are zero
     float *A = (float *) calloc(  (*graphsize) , (*graphsize)*sizeof(float)    ) ;
-    
+
     FILE *  graphfile = fopen(filename , "r");
-    
+
     int edge1, edge2;
     while (   fscanf(graphfile, "%d %d\n", &edge1, &edge2) != EOF){
         if (edge1 <= (*graphsize) && edge2 <= (*graphsize) && edge1 >=1 && edge2 >=1 ){
-            
+
             A[(edge1-1) + (edge2-1)* (*graphsize) ] = 1;
-            
+
             // if the graph is undirected, we force it to be undirected
             if (directed == 0){
                     A[(edge2-1) + (edge1-1)* (*graphsize) ] = 1;
@@ -318,16 +318,16 @@ float * read_graph_into_adj_mat(char * filename, int *graphsize, int directed){
     fclose(graphfile);
 
     return A;
-    
+
 }
 
 
 // this writes a vector to an output file
 void save_vec_to_file(int * vec, int n , char* output_file){
-    
+
     // we only write if there is stuff to write. Otherwise we leave things as they are
     if (n > 1){
-        FILE *  vec_file = fopen(output_file , "w");  
+        FILE *  vec_file = fopen(output_file , "w");
 
         for (int i = 0; i < n-1; i++){
             fprintf(vec_file,"%d ", vec[i]);
@@ -339,13 +339,13 @@ void save_vec_to_file(int * vec, int n , char* output_file){
 }
 
 int main(int argc,char *argv[]){
-  
-    
+
+
     if (argc != 8){
         printf("The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size\n");
         return 0;
     }
-    
+
     char * filenameA    = (char *) argv[1];
     char * filenameB    = (char *) argv[2];
     char * fileoutput   = (char *) argv[3];
@@ -353,31 +353,32 @@ int main(int argc,char *argv[]){
     int directed        = atoi(    argv[5]  );
     int cpu_vs_gpu      = atoi(    argv[6]  );
     int graphsize       = atoi(    argv[7]  );
-    
+    int which_cpu       = atoi(    argv[8]  );
+
     int sizeA = graphsize;
     int sizeB = graphsize;
-    
+
     float *A = read_graph_into_adj_mat( filenameA , &sizeA , directed );
     float *B = read_graph_into_adj_mat( filenameB , &sizeB , directed );
 
-    
+
     if ( sizeA != sizeB ){
         printf("Error, graphs of different sizes\n");
         return 0;
     }
-    
+
     clock_t cpu_start, cpu_end;
     float cputime;
-    
+
     int n = sizeA;
-    
+
     lint nfact = fact(n);
-    
-    
+
+
     if (cpu_vs_gpu == 1){
         int * bestperm = (int *) malloc(n * sizeof( int )  ); //this is where we will keep the best perm
         cpu_start = clock();
-        
+
         // we might want to try different norms
         float val;
 	float val1;
@@ -387,7 +388,7 @@ int main(int argc,char *argv[]){
         if (norm_to_use == 2){
         	compute_optimal_match(n, A, B, &fro_norm_square , bestperm , &val , &val1);
         }
-        
+
         cpu_end = clock();
         printf("CPU Opt Min  Val = %f\n", val);
 	printf("CPU Opt Mean  Val = %f\n", val1);
@@ -400,9 +401,9 @@ int main(int argc,char *argv[]){
         // free the vector
         free(bestperm);
     }else{
-    
+
         // now we have some GPU code
-        cudaSetDevice( 0 );
+        cudaSetDevice( which_cpu );
         cudaDeviceReset();
 
         // here we compute the division of work
@@ -412,7 +413,7 @@ int main(int argc,char *argv[]){
         int chunck_per_cycle = numblocks*numthreadsperblock;
         int num_stuff_per_thread = 1 + (nfact / chunck_per_cycle );
         //printf("Threads per block  = %d, Num blocks = %d , chunck_per_cycle = %d, num_stuff_per_thread = %d\n",numthreadsperblock,numblocks,chunck_per_cycle,num_stuff_per_thread);
-        
+
         float * d_A;
         float * d_B;
         float * d_obj_vals;
@@ -440,12 +441,12 @@ int main(int argc,char *argv[]){
         cudaMalloc((void **)&d_A, n*n*sizeof(float) );
         cudaMalloc((void **)&d_B, n*n*sizeof(float) );
         cudaMalloc((void **)&d_obj_vals, chunck_per_cycle*sizeof(float) );
-        cudaMalloc((void **)&d_obj_perms, chunck_per_cycle*sizeof(lint) );    
+        cudaMalloc((void **)&d_obj_perms, chunck_per_cycle*sizeof(lint) );
         cudaMalloc((void **)&d_local_sums, chunck_per_cycle*sizeof(double) );
-        cudaMalloc((void **)&d_local_num_perms, chunck_per_cycle*sizeof(int) );  
+        cudaMalloc((void **)&d_local_num_perms, chunck_per_cycle*sizeof(int) );
 
-	cudaMemcpy( (void*) d_A , (void*) A , n*n*sizeof(float) , cudaMemcpyHostToDevice ); 
-        cudaMemcpy( (void*) d_B , (void*) B , n*n*sizeof(float) , cudaMemcpyHostToDevice ); 
+	cudaMemcpy( (void*) d_A , (void*) A , n*n*sizeof(float) , cudaMemcpyHostToDevice );
+        cudaMemcpy( (void*) d_B , (void*) B , n*n*sizeof(float) , cudaMemcpyHostToDevice );
         cudaEventRecord(gpu_end, 0);
         cudaEventSynchronize(gpu_end);  //this is necessary to make sure that we measure time accurately. We can also use cudaDeviceSynchronize() but that is a bit of an overkill
         cudaEventElapsedTime(&gputime, gpu_start, gpu_end);
@@ -453,7 +454,7 @@ int main(int argc,char *argv[]){
 
         // this is the function pointer that we will pass to the GPU
         float (*h_d_per_metric)(int , float *, float * , int * );
-        
+
         // we might want to use different norms
         if (norm_to_use == 1){
             cudaMemcpyFromSymbol(&h_d_per_metric, d_ptr_L1_norm, sizeof( float (*)(int , float *, float * , int * )  ));
@@ -461,7 +462,7 @@ int main(int argc,char *argv[]){
         if (norm_to_use == 2){
             cudaMemcpyFromSymbol(&h_d_per_metric, d_ptr_fro_norm_square, sizeof( float (*)(int , float *, float * , int * )  ));
         }
-        
+
         cudaEventRecord(gpu_start, 0);
         kernel_to_compute_optimal_match<<<numblocks,numthreadsperblock,n*n*2*sizeof(float)>>>(chunck_per_cycle,num_stuff_per_thread , nfact,  n, d_A, d_B, h_d_per_metric , d_obj_vals, d_obj_perms , d_local_sums, d_local_num_perms);
         cudaEventRecord(gpu_end, 0);
@@ -471,10 +472,10 @@ int main(int argc,char *argv[]){
 
         // now we copy the stuff back to the CPU and get the maximum by hand
         cudaEventRecord(gpu_start, 0);
-        cudaMemcpy( (void*) h_obj_vals , (void*) d_obj_vals , chunck_per_cycle*sizeof(float) , cudaMemcpyDeviceToHost ); 
-        cudaMemcpy( (void*) h_obj_perms , (void*) d_obj_perms , chunck_per_cycle*sizeof(float) , cudaMemcpyDeviceToHost ); 
- 	cudaMemcpy( (void*) h_local_sums , (void*) d_local_sums , chunck_per_cycle*sizeof(double) , cudaMemcpyDeviceToHost ); 
-        cudaMemcpy( (void*) h_local_num_perms , (void*) d_local_num_perms , chunck_per_cycle*sizeof(int) , cudaMemcpyDeviceToHost );        
+        cudaMemcpy( (void*) h_obj_vals , (void*) d_obj_vals , chunck_per_cycle*sizeof(float) , cudaMemcpyDeviceToHost );
+        cudaMemcpy( (void*) h_obj_perms , (void*) d_obj_perms , chunck_per_cycle*sizeof(float) , cudaMemcpyDeviceToHost );
+ 	cudaMemcpy( (void*) h_local_sums , (void*) d_local_sums , chunck_per_cycle*sizeof(double) , cudaMemcpyDeviceToHost );
+        cudaMemcpy( (void*) h_local_num_perms , (void*) d_local_num_perms , chunck_per_cycle*sizeof(int) , cudaMemcpyDeviceToHost );
 
 	cudaEventRecord(gpu_end, 0);
         cudaEventSynchronize(gpu_end);  //this is necessary to make sure that we measure time accurately. We can also use cudaDeviceSynchronize() but that is a bit of an overkill
@@ -485,7 +486,7 @@ int main(int argc,char *argv[]){
         cpu_start = clock();
         float best_gpu_val = FLT_MAX;
         lint best_ix;
-	double mean_gpu_val = 0.0;	
+	double mean_gpu_val = 0.0;
 
         for (int i = 0 ; i < chunck_per_cycle ; i++){
             float val = h_obj_vals[i];
@@ -496,13 +497,13 @@ int main(int argc,char *argv[]){
             }
         }
 	mean_gpu_val = mean_gpu_val / ((double) nfact);
-       
+
 
         int * perm = (int *) malloc(n * sizeof(int));
         int * scrap = (int *) malloc(n * sizeof(int));
         index_to_perm(best_ix,  n, perm, scrap);
-        printf("GPU Opt Val = %f\n", best_gpu_val);     
-	printf("GPU Mean Val = %f\n", mean_gpu_val);  
+        printf("GPU Opt Val = %f\n", best_gpu_val);
+	printf("GPU Mean Val = %f\n", mean_gpu_val);
         printvec(perm, n);
         save_vec_to_file(perm,  n , fileoutput);
         cpu_end = clock();
@@ -514,12 +515,12 @@ int main(int argc,char *argv[]){
         cudaFree(d_obj_vals);
         cudaFree(d_obj_perms);
   	cudaFree(d_local_sums);
-        cudaFree(d_local_num_perms);        
+        cudaFree(d_local_num_perms);
 
         free(h_obj_vals);
         free(h_obj_perms);
   	free(h_local_sums);
-        free(h_local_num_perms);        
+        free(h_local_num_perms);
 
 	free(perm);
         free(scrap);
@@ -528,12 +529,12 @@ int main(int argc,char *argv[]){
         cudaDeviceSynchronize();
 
     }
-    
-    
+
+
     free(A);
     free(B);
-    
-    
+
+
     return 0;
-     
+
 }

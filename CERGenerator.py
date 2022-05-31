@@ -151,28 +151,6 @@ def minDistance(graphA, graphB):
             ret = dist
     return ret
 
-def minDistanceCUDA(graphA, graphB):
-    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
-    if len(nodeVals)==0:
-        nvertices = 0
-        return 0
-    nvertices = max(nodeVals)
-    fileA ="graphs/tempA.txt"
-    fileB ="graphs/tempB.txt"
-    outputFile = "graphs/tempOut.txt"
-    outputFile2 = "graphs/tempOut2.txt"
-    graphToFile(graphA, fileA)
-    graphToFile(graphB, fileB)
-    os.system("rm {}".format(outputFile))
-    os.system("rm {}".format(outputFile2))
-    os.system("./bruteforce {} {} {} 1 0 0 {} >> {}".format(fileA, fileB, outputFile, nvertices, outputFile2))
-    file = open(outputFile2,'r')
-    output = file.read()
-    outputLines = output.split('\n')
-    outputLines = [line for line in outputLines if 'GPU Opt' in line]
-    return float(outputLines[0].split()[-1])
-
-
 
 def meanDistance(graphA, graphB):
     nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
@@ -188,27 +166,6 @@ def meanDistance(graphA, graphB):
         nperms +=1
     ret = ret/nperms
     return ret
-
-def meanDistanceCUDA(graphA, graphB):
-    nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
-    if len(nodeVals)==0:
-        nvertices = 0
-        return 0
-    nvertices = max(nodeVals)
-    fileA ="graphs/tempA.txt"
-    fileB ="graphs/tempB.txt"
-    outputFile = "graphs/tempOut.txt"
-    outputFile2 = "graphs/tempOut2.txt"
-    graphToFile(graphA, fileA)
-    graphToFile(graphB, fileB)
-    os.system("rm {}".format(outputFile))
-    os.system("rm {}".format(outputFile2))
-    os.system("./bruteforce {} {} {} 1 0 0 {} >> {}".format(fileA, fileB, outputFile, nvertices, outputFile2))
-    file = open(outputFile2,'r')
-    output = file.read()
-    outputLines = output.split('\n')
-    outputLines = [line for line in outputLines if 'GPU Mean' in line]
-    return float(outputLines[0].split()[-1])
 
 def minAndMeanDistCUDA(graphA, graphB, randomGPU=True):
     gpu = 0
@@ -228,7 +185,7 @@ def minAndMeanDistCUDA(graphA, graphB, randomGPU=True):
     graphToFile(graphB, fileB)
     os.system("rm {}".format(outputFile))
     os.system("rm {}".format(outputFile2))
-    os.system("./bruteforce {} {} {} 1 0 0 {} >> {}".format(fileA, fileB, outputFile, nvertices, outputFile2))
+    os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputFile, nvertices, gpu outputFile2))
     file = open(outputFile2,'r')
     output = file.read()
     outputLines = output.split('\n')
@@ -237,6 +194,12 @@ def minAndMeanDistCUDA(graphA, graphB, randomGPU=True):
     minDist = float(outputLines1[0].split()[-1])
     meanDist = float(outputLines2[0].split()[-1])
     return minDist, meanDist
+
+def minDistanceCUDA(graphA, graphB, randomGPU=True):
+    return minAndMeanDistCUDA(graphA, graphB, randomGPU=True)[0]
+
+def meanDistanceCUDA(graphA, graphB, randomGPU=True):
+    return minAndMeanDistCUDA(graphA, graphB, randomGPU=True)[1]
 
 
 #########################
@@ -455,7 +418,7 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None, parallel=Fa
     if parallel:
         graphStrings = [graphListToString(g) for g in graphs]
         pairs = [(i,j) for j in range(L) for i in range(j)]
-        my_func = lambda x: (x[0], x[1], metric(x[0],x[1]))
+        my_func = lambda x: (x[0], x[1], metric(graphStrings[x[0]],graphStrings[x[1]]))
         pool = Pool(NUM_CPUS)
         results = pool.map(my_func, pairs)
         distances = {(x[0], x[1]): x[2] for x in results}
