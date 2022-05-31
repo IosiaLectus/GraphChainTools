@@ -205,7 +205,11 @@ def meanDistanceCUDA(graphA, graphB):
     outputLines = [line for line in outputLines if 'GPU Mean' in line]
     return float(outputLines[0].split()[-1])
 
-def minAndMeanDistCUDA(graphA, graphB):
+def minAndMeanDistCUDA(graphA, graphB, randomGPU=True):
+    gpu = 0
+    if randomGPU:
+        ngpus = int(bytes(subprocess.check_output(["nvidia-smi --list-gpus | wc -l"])).decode('utf-8').split()[0])
+        gpu = random.randint(0,ngpus-1)
     nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
     if len(nodeVals)==0:
         nvertices = 0
@@ -450,7 +454,7 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None,parallel=Fal
             if parallel:
                 metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
                 name = metricNames[metric]
-                d=int(bytes(subprocess.check_output(["python3", "CERDMatParallel.py",name,graphStrings[i],graphStrings[j]])).decode('utf-8').split()[0])
+                d=float(bytes(subprocess.check_output(["python3", "CERDMatParallel.py",name,graphStrings[i],graphStrings[j]])).decode('utf-8').split()[0])
             else:
                 d = metric(graphs[i],graphs[j])
             distances.update({(i,j): d})
