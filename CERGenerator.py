@@ -892,9 +892,9 @@ def chains_to_edge_count_scores(fin, fout):
                     if p in dict_out[n].keys():
                         if q in dict_out[n][p].keys():
                             if not evalc_name in dict_out[n][p][q].keys():
-                                dict_out[n][p][q].update(evalc_name: evalc})
+                                dict_out[n][p][q].update({evalc_name: evalc})
                             if not eval_name in dict_out[n][p][q].keys():
-                                dict_out[n][p][q].update(eval_name: eval})
+                                dict_out[n][p][q].update({eval_name: eval})
                         else:
                             dict_out[n][p].update({q: {evalc_name: evalc, eval_name: eval}})
                     else:
