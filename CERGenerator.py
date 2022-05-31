@@ -36,12 +36,28 @@ def graphListToString(graphList, verbose=False):
         print(ret)
     return ret
 
+# Read a graph from a string
+def stringToGraphList(string):
+    graph = string.split("\n")
+    graph = [e.split() for e in graph]
+    graph = [tuple([int(x) for x in e]) for e in graph]
+    graph = [e for e in graph if len(e)==2]
+    return graph
+
 # write graph to a file
 def graphToFile(graphList, fileName, verbose=False):
     to_write = graphListToString(graphList, verbose)
     file = open(fileName,'w')
     file.write(to_write)
     file.close()
+
+# read a graph from a file
+def read_file(name):
+    file = open(name, 'r')
+    string = file.read()
+    file.close()
+    graph = stringToGraphList(string)
+    return graph
 
 
 # visualize graph using networkx and pyplot
@@ -373,15 +389,6 @@ def populate_folder(nshots, nvertices, ngraphs, p, q, qq, dir):
         fileRoot="{}/graph".format(shotdir)
         graphChain(nvertices, ngraphs, p, q, qq, verbose=False, to_file=True,fileNameRoot=fileRoot)
 
-def read_file(name):
-    file = open(name, 'r')
-    graph = file.read().split("\n")
-    file.close()
-    graph = [e.split() for e in graph]
-    graph = [tuple([int(x) for x in e]) for e in graph]
-    graph = [e for e in graph if len(e)==2]
-    return graph
-
 def read_chain(dir, ngraphs):
     files = bytes(subprocess.check_output(["ls",dir])).decode('utf-8').split()
     ngraphs = min([ngraphs,len(files)])
@@ -409,9 +416,20 @@ def unpickle(filename):
     f.close()
     return d
 
-def pairwise_distance_matrix(graphs,metric,to_file=False, file=None):
-    pairs = [(i,j) for j in range(len(graphs)) for i in range(j)]
-    distances = {pair: metric(graphs[pair[0]],graphs[pair[1]]) for pair in pairs}
+def pairwise_distance_matrix(graphs,metric,to_file=False, file=None,parallel=False):
+    L = len(graphs)
+    distances = {}
+    if parallel:
+        graphStrings = [graphListToString(g) for g in graphs]
+    for j in range(L):
+        for i in range(j):
+            if parallel:
+                metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
+                name = metricNames[metric]
+                d=int(bytes(subprocess.check_output(["python3", "CERDMATParallel.py",name,graphStrings[i],graphString[j]])).decode('utf-8').split()[0])
+            else:
+                d = metric(graphs[i],graphs[j])
+            distances.update({(i,j): d})
     if to_file:
         outp = open(file,'wb')
         pickle.dump(distances, outp, -1)
@@ -640,7 +658,7 @@ def dmats_from_json(fname, metric, n, p, q, L, strict):
     dmats = [pairwise_distance_matrix(c, metric) for c in chains]
     return dmats
 
-def chains_to_dmats_json(fin, fout, metric, metric_name):
+def chains_to_dmats_json(fin, fout, metric, metric_name, parallel=True):
     json_file = open(fin,"r")
     dict_in = json.load(json_file)
     json_file.close()
@@ -659,22 +677,22 @@ def chains_to_dmats_json(fin, fout, metric, metric_name):
                     if p in dict_out[n].keys():
                         if q in dict_out[n][p].keys():
                             if not metric_name in dict_out[n][p][q].keys():
-                                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
                                 dict_out[n][p][q].update({metric_name: dmats})
                         else:
-                            dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                            dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
                             dict_out[n][p].update({q: {metric_name: dmats}})
                     else:
-                        dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                        dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
                         dict_out[n].update({p: {q: {metric_name: dmats}}})
                 else:
-                    dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                    dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
                     dict_out.update({n: {p: {q: {metric_name: dmats}}}})
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
     json_file.close()
 
-def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q):
+def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q, parallel=True):
     json_file = open(fin,"r")
     dict_in = json.load(json_file)
     json_file.close()
@@ -691,7 +709,7 @@ def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q):
         if p in dict_in[n].keys():
             if  q in dict_in[n][p].keys():
                 chains = dict_in[n][p][q]['chains']
-                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric)) for c in chains]
+                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
                 if n in dict_out.keys():
                     if p in dict_out[n].keys():
                         if q in dict_out[n][p].keys():
@@ -855,18 +873,17 @@ def main():
         for q in qlist:
             update_json_with_chains('data.json',nshots,ngraphs,nvertices,p,q,skip=True)
             print("p={}, q={} finished".format(p,q))
+    '''
 
     json_report("data.json")
 
+    chains_to_dmats_json("data.json", "dmats.json", doublyStochasticMatrixDistance, "minDistanceCUDA")
 
-    chains_to_dmats_json("data.json", "dmats.json", minDistanceCUDA, "minDistanceCUDA")
-    '''
+    #json_report("dmats.json")
 
-    json_report("dmats.json")
+    #chains_to_edge_count_scores("data.json","scores.json")
 
-    chains_to_edge_count_scores("data.json","scores.json")
-
-    json_report("scores.json")
+    #json_report("scores.json")
 
     #update_json_with_chains("data.json",nshots,num_graphs,num_vertices,p,q)
 
