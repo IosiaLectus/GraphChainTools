@@ -196,10 +196,10 @@ def minAndMeanDistCUDA(graphA, graphB, randomGPU=True):
     return minDist, meanDist
 
 def minDistanceCUDA(graphA, graphB, randomGPU=True):
-    return minAndMeanDistCUDA(graphA, graphB, randomGPU=True)[0]
+    return minAndMeanDistCUDA(graphA, graphB, randomGPU)[0]
 
 def meanDistanceCUDA(graphA, graphB, randomGPU=True):
-    return minAndMeanDistCUDA(graphA, graphB, randomGPU=True)[1]
+    return minAndMeanDistCUDA(graphA, graphB, randomGPU)[1]
 
 
 #########################
@@ -416,9 +416,8 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None, parallel=Fa
     L = len(graphs)
     distances = {}
     if parallel:
-        graphStrings = [graphListToString(g) for g in graphs]
         pairs = [(i,j) for j in range(L) for i in range(j)]
-        my_func = lambda x: (x[0], x[1], metric(graphStrings[x[0]],graphStrings[x[1]]))
+        my_func = lambda x: (x[0], x[1], metric(graphs[x[0]],graphs[x[1]]))
         pool = Pool(NUM_CPUS)
         results = pool.map(my_func, pairs)
         distances = {(x[0], x[1]): x[2] for x in results}
@@ -881,7 +880,7 @@ def main():
 
     json_report("data.json")
 
-    chains_to_dmats_json("data.json", "dmats.json", doublyStochasticMatrixDistance, "minDistanceCUDA")
+    chains_to_dmats_json("data.json", "dmats.json", doublyStochasticMatrixDistance, "doublyStochasticMatrixDistance")
 
     #json_report("dmats.json")
 
