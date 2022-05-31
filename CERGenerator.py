@@ -450,7 +450,7 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None,parallel=Fal
             if parallel:
                 metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
                 name = metricNames[metric]
-                d=int(bytes(subprocess.check_output(["python3", "CERDMATParallel.py",name,graphStrings[i],graphStrings[j]])).decode('utf-8').split()[0])
+                d=int(bytes(subprocess.check_output(["python3", "CERDMatParallel.py",name,graphStrings[i],graphStrings[j]])).decode('utf-8').split()[0])
             else:
                 d = metric(graphs[i],graphs[j])
             distances.update({(i,j): d})
