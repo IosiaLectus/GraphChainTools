@@ -914,20 +914,27 @@ def chains_to_edge_count_scores(fin, fout):
 
 # Stuff that will actually be done
 def main():
-    '''
     nshots = 200
-    num_vertices = int(sys.argv[1])
-    num_graphs = int(sys.argv[2])
-    p = float(sys.argv[3])
-    q = float(sys.argv[4])
-    qq = q
-    '''
+    #num_vertices = int(sys.argv[1])
+    #num_graphs = int(sys.argv[2])
+    p = float(sys.argv[1])
+    #q = float(sys.argv[4])
+    #qq = q
 
-    nshots = 200
     nvertices = 12
     ngraphs = 100
-    plist = [0.05,0.1,0.2,0.3,0.4,0.5]
+    #plist = [0.05,0.1,0.2,0.3,0.4,0.5]
     qlist = [0.01,0.05,0.1,0.2,0.3]
+
+    metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
+    metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
+
+    metric = doublyStochasticMatrixDistance
+    mname = metricNames[metric]
+
+    for q in qlist:
+        chains_to_dmats_json_partial("data.json", "dmats.json", metric, mname, nvertices, p, q, parallel=True)
+        print("p={}, q={}, metric={} finished".format(p,q,mname))
 
     #json_report("data.json")
     '''
@@ -936,13 +943,9 @@ def main():
             update_json_with_chains('data.json',nshots,ngraphs,nvertices,p,q,skip=True)
             print("p={}, q={} finished".format(p,q))
     '''
+    #json_report("data.json")
 
-    metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
-    metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
-
-    json_report("data.json")
-
-    chains_to_dmats_json_CUDA("data.json", "dmats.json")
+    #chains_to_dmats_json_CUDA("data.json", "dmats.json")
 
     #json_report("dmats.json")
 
