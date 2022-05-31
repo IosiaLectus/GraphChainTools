@@ -185,7 +185,7 @@ def minAndMeanDistCUDA(graphA, graphB, randomGPU=True):
     graphToFile(graphB, fileB)
     os.system("rm {}".format(outputFile))
     os.system("rm {}".format(outputFile2))
-    os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputFile, nvertices, gpu outputFile2))
+    os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputFile, nvertices, gpu, outputFile2))
     file = open(outputFile2,'r')
     output = file.read()
     outputLines = output.split('\n')
