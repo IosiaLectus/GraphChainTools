@@ -438,6 +438,25 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None, parallel=Fa
         pickle.dump(distances, outp, -1)
     return distances
 
+def pairwise_distance_matrix_CUDA(graphs, parallel=False):
+    L = len(graphs)
+    minDistances = {}
+    meanDistances = {}
+    if parallel:
+        pairs = [(i,j) for j in range(L) for i in range(j)]
+        my_func = lambda x: (x[0], x[1], minAndMeanDistCUDA(graphs[x[0]],graphs[x[1]]))
+        pool = Pool(NUM_CPUS)
+        results = pool.map(my_func, pairs)
+        minDistances = {(x[0], x[1]): x[2][0] for x in results}
+        meannDistances = {(x[0], x[1]): x[2][1] for x in results}
+    else:
+        for j in range(L):
+            for i in range(j):
+                dMin, dMean = minAndMeanDistCUDA(graphs[i],graphs[j])
+                minDistances.update({(i,j): dMin})
+                meanDistances.update({(i,j): dMean})
+    return minDistances, meanDistances
+
 def pairwise_distance_dict_to_list(dmat_dict, L=-1):
     if L<1:
         L = max([k[1] for k in dmat_dict.keys()])-1
@@ -695,6 +714,46 @@ def chains_to_dmats_json(fin, fout, metric, metric_name, parallel=True):
     json.dump(dict_out, json_file)
     json_file.close()
 
+def chains_to_dmats_json_CUDA(fin, fout, parallel=True):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    try:
+        json_file = open(fout,"r")
+        dict_out = json.load(json_file)
+        json_file.close()
+    except:
+        dict_out = {}
+    nlist = [n for n in dict_in.keys() if int(n)<15]
+    metrics = [minDistanceCUDA, meanDistanceCUDA]
+    metric_names = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA"}
+    metric_pos = {minDistanceCUDA: 0, meanDistanceCUDA: 1}
+    for n in nlist:
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                chains = dict_in[n][p][q]['chains']
+                dmat_pairs = [pairwise_distance_matrix_CUDA(c, parallel) for c in chains]
+                for metric in metrics:
+                    metric_name = metric_names[metric]
+                    if n in dict_out.keys():
+                        if p in dict_out[n].keys():
+                            if q in dict_out[n][p].keys():
+                                if not metric_name in dict_out[n][p][q].keys():
+                                    dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                                    dict_out[n][p][q].update({metric_name: dmats})
+                            else:
+                                dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                                dict_out[n][p].update({q: {metric_name: dmats}})
+                        else:
+                            dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                            dict_out[n].update({p: {q: {metric_name: dmats}}})
+                    else:
+                        dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                        dict_out.update({n: {p: {q: {metric_name: dmats}}}})
+    json_file = open(fout, "w")
+    json.dump(dict_out, json_file)
+    json_file.close()
+
 def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q, parallel=True):
     json_file = open(fin,"r")
     dict_in = json.load(json_file)
@@ -878,9 +937,12 @@ def main():
             print("p={}, q={} finished".format(p,q))
     '''
 
+    metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
+    metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
+
     json_report("data.json")
 
-    chains_to_dmats_json("data.json", "dmats.json", doublyStochasticMatrixDistance, "doublyStochasticMatrixDistance")
+    chains_to_dmats_json_CUDA("data.json", "dmats.json")
 
     #json_report("dmats.json")
 
@@ -894,11 +956,6 @@ def main():
 
     #json_report("data.json")
     #json_report("scores.json")
-
-    #metrics = [edgeCountDistance, disagreementCount, specDistance,minDistanceCUDA,meanDistanceCUDA,doublyStochasticMatrixDistance]
-    #metrics = [doublyStochasticMatrixDistance, minDistanceCUDA, meanDistanceCUDA]
-    #metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
-
 
 # Do stuff
 if __name__ == '__main__':
