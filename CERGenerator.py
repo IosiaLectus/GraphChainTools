@@ -677,16 +677,16 @@ def chains_to_dmats_json(fin, fout, metric, metric_name, parallel=True):
                     if p in dict_out[n].keys():
                         if q in dict_out[n][p].keys():
                             if not metric_name in dict_out[n][p][q].keys():
-                                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
+                                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, False, None, parallel)) for c in chains]
                                 dict_out[n][p][q].update({metric_name: dmats})
                         else:
-                            dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
+                            dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, False, None, parallel)) for c in chains]
                             dict_out[n][p].update({q: {metric_name: dmats}})
                     else:
-                        dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
+                        dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, False, None, parallel)) for c in chains]
                         dict_out[n].update({p: {q: {metric_name: dmats}}})
                 else:
-                    dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
+                    dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, False, None, parallel)) for c in chains]
                     dict_out.update({n: {p: {q: {metric_name: dmats}}}})
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
@@ -709,7 +709,7 @@ def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q, parall
         if p in dict_in[n].keys():
             if  q in dict_in[n][p].keys():
                 chains = dict_in[n][p][q]['chains']
-                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, parallel)) for c in chains]
+                dmats = [pairwise_distance_dict_to_list(pairwise_distance_matrix(c, metric, False, None, parallel)) for c in chains]
                 if n in dict_out.keys():
                     if p in dict_out[n].keys():
                         if q in dict_out[n][p].keys():
