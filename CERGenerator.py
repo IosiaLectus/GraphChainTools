@@ -170,7 +170,7 @@ def meanDistance(graphA, graphB):
 def minAndMeanDistCUDA(graphA, graphB, randomGPU=True):
     gpu = 0
     if randomGPU:
-        ngpus = int(bytes(subprocess.check_output(["nvidia-smi --list-gpus | wc -l"])).decode('utf-8').split()[0])
+        ngpus = int(bytes(subprocess.check_output(["nvidia-smi", "--list-gpus", "|", "wc", "-l"])).decode('utf-8').split()[0])
         gpu = random.randint(0,ngpus-1)
     nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
     if len(nodeVals)==0:
@@ -917,7 +917,7 @@ def main():
     nshots = 200
     #num_vertices = int(sys.argv[1])
     #num_graphs = int(sys.argv[2])
-    p = float(sys.argv[1])
+    #p = float(sys.argv[1])
     #q = float(sys.argv[4])
     #qq = q
 
@@ -931,10 +931,11 @@ def main():
 
     metric = doublyStochasticMatrixDistance
     mname = metricNames[metric]
-
+    '''
     for q in qlist:
         chains_to_dmats_json_partial("data.json", "dmats.json", metric, mname, nvertices, p, q, parallel=True)
         print("p={}, q={}, metric={} finished".format(p,q,mname))
+    '''
 
     #json_report("data.json")
     '''
@@ -945,7 +946,7 @@ def main():
     '''
     #json_report("data.json")
 
-    #chains_to_dmats_json_CUDA("data.json", "dmats.json")
+    chains_to_dmats_json_CUDA("data.json", "dmats.json")
 
     #json_report("dmats.json")
 
