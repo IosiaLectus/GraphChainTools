@@ -767,7 +767,7 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
     metrics = [minDistanceCUDA, meanDistanceCUDA]
     metric_names = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA"}
     metric_pos = {minDistanceCUDA: 0, meanDistanceCUDA: 1}
-    print("N={}, p={}, q={}, keys={}\n".format(n,p,q,dict_in.keys())
+    print("N={}, p={}, q={}, keys={}\n".format(n,p,q,dict_in.keys()))
     n = str(n)
     p = str(p)
     q = str(q)
