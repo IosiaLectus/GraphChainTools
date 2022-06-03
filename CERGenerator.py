@@ -767,7 +767,11 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
     metrics = [minDistanceCUDA, meanDistanceCUDA]
     metric_names = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA"}
     metric_pos = {minDistanceCUDA: 0, meanDistanceCUDA: 1}
-    chains = dict_in[n][p][q]['chains']
+    try:
+        chains = dict_in[n][p][q]['chains']
+    except:
+        return
+        print(dict_in.keys())
     dmat_pairs = [pairwise_distance_matrix_CUDA(c, parallel, ngpus) for c in chains]
     for metric in metrics:
         metric_name = metric_names[metric]
