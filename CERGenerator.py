@@ -167,10 +167,9 @@ def meanDistance(graphA, graphB):
     ret = ret/nperms
     return ret
 
-def minAndMeanDistCUDA(graphA, graphB, randomGPU=True):
+def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
     gpu = 0
     if randomGPU:
-        ngpus = int(bytes(subprocess.check_output(["nvidia-smi", "--list-gpus", "|", "wc", "-l"])).decode('utf-8').split()[0])
         gpu = random.randint(0,ngpus-1)
     nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
     if len(nodeVals)==0:
@@ -438,13 +437,13 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None, parallel=Fa
         pickle.dump(distances, outp, -1)
     return distances
 
-def pairwise_distance_matrix_CUDA(graphs, parallel=False):
+def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
     L = len(graphs)
     minDistances = {}
     meanDistances = {}
     if parallel:
         pairs = [(i,j) for j in range(L) for i in range(j)]
-        my_func = lambda x: (x[0], x[1], minAndMeanDistCUDA(graphs[x[0]],graphs[x[1]]))
+        my_func = lambda x: (x[0], x[1], minAndMeanDistCUDA(graphs[x[0]], graphs[x[1]], ngpus))
         pool = Pool(NUM_CPUS)
         results = pool.map(my_func, pairs)
         minDistances = {(x[0], x[1]): x[2][0] for x in results}
@@ -452,7 +451,7 @@ def pairwise_distance_matrix_CUDA(graphs, parallel=False):
     else:
         for j in range(L):
             for i in range(j):
-                dMin, dMean = minAndMeanDistCUDA(graphs[i],graphs[j])
+                dMin, dMean = minAndMeanDistCUDA( graphs[i], graphs[j], ngpus)
                 minDistances.update({(i,j): dMin})
                 meanDistances.update({(i,j): dMean})
     return minDistances, meanDistances
@@ -714,7 +713,7 @@ def chains_to_dmats_json(fin, fout, metric, metric_name, parallel=True):
     json.dump(dict_out, json_file)
     json_file.close()
 
-def chains_to_dmats_json_CUDA(fin, fout, parallel=True):
+def chains_to_dmats_json_CUDA(fin, fout, ngpus=1, parallel=True):
     json_file = open(fin,"r")
     dict_in = json.load(json_file)
     json_file.close()
@@ -732,7 +731,7 @@ def chains_to_dmats_json_CUDA(fin, fout, parallel=True):
         for p in dict_in[n].keys():
             for q in dict_in[n][p].keys():
                 chains = dict_in[n][p][q]['chains']
-                dmat_pairs = [pairwise_distance_matrix_CUDA(c, parallel) for c in chains]
+                dmat_pairs = [pairwise_distance_matrix_CUDA(c, ngpus, parallel) for c in chains]
                 for metric in metrics:
                     metric_name = metric_names[metric]
                     if n in dict_out.keys():
@@ -750,6 +749,43 @@ def chains_to_dmats_json_CUDA(fin, fout, parallel=True):
                     else:
                         dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
                         dict_out.update({n: {p: {q: {metric_name: dmats}}}})
+    json_file = open(fout, "w")
+    json.dump(dict_out, json_file)
+    json_file.close()
+
+def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    try:
+        json_file = open(fout,"r")
+        dict_out = json.load(json_file)
+        json_file.close()
+    except:
+        dict_out = {}
+    nlist = [n for n in dict_in.keys() if int(n)<15]
+    metrics = [minDistanceCUDA, meanDistanceCUDA]
+    metric_names = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA"}
+    metric_pos = {minDistanceCUDA: 0, meanDistanceCUDA: 1}
+    chains = dict_in[n][p][q]['chains']
+    dmat_pairs = [pairwise_distance_matrix_CUDA(c, parallel, ngpus) for c in chains]
+    for metric in metrics:
+        metric_name = metric_names[metric]
+        if n in dict_out.keys():
+            if p in dict_out[n].keys():
+                if q in dict_out[n][p].keys():
+                    if not metric_name in dict_out[n][p][q].keys():
+                        dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                        dict_out[n][p][q].update({metric_name: dmats})
+                else:
+                    dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                    dict_out[n][p].update({q: {metric_name: dmats}})
+            else:
+                dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                dict_out[n].update({p: {q: {metric_name: dmats}}})
+        else:
+            dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+            dict_out.update({n: {p: {q: {metric_name: dmats}}}})
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
     json_file.close()
@@ -917,7 +953,8 @@ def main():
     nshots = 200
     #num_vertices = int(sys.argv[1])
     #num_graphs = int(sys.argv[2])
-    #p = float(sys.argv[1])
+    p = float(sys.argv[1])
+    ngpus = int(sys.argv[2])
     #q = float(sys.argv[4])
     #qq = q
 
@@ -931,11 +968,9 @@ def main():
 
     metric = doublyStochasticMatrixDistance
     mname = metricNames[metric]
-    '''
     for q in qlist:
-        chains_to_dmats_json_partial("data.json", "dmats.json", metric, mname, nvertices, p, q, parallel=True)
+        chains_to_dmats_json_partial_CUDA("data.json", "dmats.json", nvertices, p, q, ngpus)
         print("p={}, q={}, metric={} finished".format(p,q,mname))
-    '''
 
     #json_report("data.json")
     '''
@@ -945,8 +980,6 @@ def main():
             print("p={}, q={} finished".format(p,q))
     '''
     #json_report("data.json")
-
-    chains_to_dmats_json_CUDA("data.json", "dmats.json")
 
     #json_report("dmats.json")
 
