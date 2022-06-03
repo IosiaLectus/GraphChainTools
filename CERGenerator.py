@@ -176,16 +176,14 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
         nvertices = 0
         return 0
     nvertices = max(nodeVals)
-    fileA ="graphs/tempA.txt"
-    fileB ="graphs/tempB.txt"
-    outputFile = "graphs/tempOut.txt"
-    outputFile2 = "graphs/tempOut2.txt"
+    fileA ="graphs/tempA"+ str(random.randint(10**3,10**5))+ ".txt"
+    fileB ="graphs/tempB"+ str(random.randint(10**3,10**5))+ ".txt"
+    outputPermFile = "graphs/tempOut"+ str(random.randint(10**3,10**5))+ ".txt"
+    outputFile2 = "graphs/tempOut2" + str(random.randint(10**3,10**5))+ ".txt"
     graphToFile(graphA, fileA)
     graphToFile(graphB, fileB)
-    os.system("rm {}".format(outputFile))
-    os.system("rm {}".format(outputFile2))
-    os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputFile, nvertices, gpu, outputFile2))
-    #The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size
+    os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputPermFile, nvertices, gpu, outputFile2))
+    #The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size, GPUID
     file = open(outputFile2,'r')
     output = file.read()
     outputLines = output.split('\n')
@@ -193,6 +191,10 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
     outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
     minDist = float(outputLines1[0].split()[-1])
     meanDist = float(outputLines2[0].split()[-1])
+    os.system("rm {}".format(outputPermFile))
+    os.system("rm {}".format(outputFile2))
+    os.system("rm {}".format(fileA))
+    os.system("rm {}".format(fileB))
     return minDist, meanDist
 
 def minDistanceCUDA(graphA, graphB, randomGPU=True):
@@ -452,8 +454,8 @@ def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
     else:
         for j in range(L):
             for i in range(j):
-                print("\nDoing pair({},{})\n".format(i,j))
                 dMin, dMean = minAndMeanDistCUDA( graphs[i], graphs[j], ngpus)
+                print("\nDoing pair ({},{}) dMin={} dMean={}\n".format(i,j,dMin,dMean))
                 minDistances.update({(i,j): dMin})
                 meanDistances.update({(i,j): dMean})
     return minDistances, meanDistances
@@ -961,6 +963,7 @@ def main():
     #num_graphs = int(sys.argv[2])
     p = float(sys.argv[1])
     ngpus = int(sys.argv[2])
+    outfile = sys.argv[3]
     #q = float(sys.argv[4])
     #qq = q
 
@@ -978,7 +981,7 @@ def main():
     metric = doublyStochasticMatrixDistance
     mname = metricNames[metric]
     for q in qlist:
-        chains_to_dmats_json_partial_CUDA("data.json", "dmats.json", nvertices, p, q, ngpus, parallel=False)
+        chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=False)
         print("p={}, q={}, metric={} finished".format(p,q,mname))
 
     '''
