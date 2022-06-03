@@ -966,13 +966,15 @@ def main():
     metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
     metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
 
+
+    json_report("data.json")
+
     metric = doublyStochasticMatrixDistance
     mname = metricNames[metric]
     for q in qlist:
         chains_to_dmats_json_partial_CUDA("data.json", "dmats.json", nvertices, p, q, ngpus)
         print("p={}, q={}, metric={} finished".format(p,q,mname))
 
-    #json_report("data.json")
     '''
     for p in plist:
         for q in qlist:
