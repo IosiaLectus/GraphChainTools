@@ -440,13 +440,20 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None, parallel=Fa
         pickle.dump(distances, outp, -1)
     return distances
 
+def distWrapper(x, graphs):
+    i = x[0]
+    j = x[1]
+    dMin, dMean = minAndMeanDistCUDA(graphs[i], graphs[j])
+    print ("\npair ({},{}) dMin = {} dMean = {}\n".format(i,j,dMin,dMean))
+    return (i, j, (dMin, dMean)))
+
 def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
     L = len(graphs)
     minDistances = {}
     meanDistances = {}
     if parallel:
         pairs = [(i,j) for j in range(L) for i in range(j)]
-        my_func = lambda x: (x[0], x[1], minAndMeanDistCUDA(graphs[x[0]], graphs[x[1]], ngpus))
+        my_func = lambda x: distWrapper(x, graphs)
         pool = Pool(NUM_CPUS)
         results = pool.map(my_func, pairs)
         minDistances = {(x[0], x[1]): x[2][0] for x in results}
@@ -981,7 +988,7 @@ def main():
     metric = doublyStochasticMatrixDistance
     mname = metricNames[metric]
     for q in qlist:
-        chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=False)
+        chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=True)
         print("p={}, q={}, metric={} finished".format(p,q,mname))
 
     '''
