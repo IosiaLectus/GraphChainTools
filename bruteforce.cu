@@ -341,8 +341,8 @@ void save_vec_to_file(int * vec, int n , char* output_file){
 int main(int argc,char *argv[]){
 
 
-    if (argc != 8){
-        printf("The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size\n");
+    if (argc != 9){
+        printf("The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size, gpuID\n");
         return 0;
     }
 
@@ -353,7 +353,7 @@ int main(int argc,char *argv[]){
     int directed        = atoi(    argv[5]  );
     int cpu_vs_gpu      = atoi(    argv[6]  );
     int graphsize       = atoi(    argv[7]  );
-    int which_cpu       = atoi(    argv[8]  );
+    int which_Gpu       = atoi(    argv[8]  );
 
     int sizeA = graphsize;
     int sizeB = graphsize;
@@ -403,7 +403,7 @@ int main(int argc,char *argv[]){
     }else{
 
         // now we have some GPU code
-        cudaSetDevice( which_cpu );
+        cudaSetDevice( which_Gpu );
         cudaDeviceReset();
 
         // here we compute the division of work
