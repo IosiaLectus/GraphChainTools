@@ -451,6 +451,7 @@ def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
     else:
         for j in range(L):
             for i in range(j):
+                print("\nDoing pair({},{})\n".format(i,j))
                 dMin, dMean = minAndMeanDistCUDA( graphs[i], graphs[j], ngpus)
                 minDistances.update({(i,j): dMin})
                 meanDistances.update({(i,j): dMean})
@@ -772,7 +773,7 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
     p = str(p)
     q = str(q)
     chains = dict_in[n][p][q]['chains']
-    dmat_pairs = [pairwise_distance_matrix_CUDA(c, parallel, ngpus) for c in chains]
+    dmat_pairs = [pairwise_distance_matrix_CUDA(c, ngpus, parallel) for c in chains]
     for metric in metrics:
         metric_name = metric_names[metric]
         if n in dict_out.keys():
