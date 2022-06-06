@@ -445,7 +445,7 @@ def distWrapper(x, graphs):
     j = x[1]
     dMin, dMean = minAndMeanDistCUDA(graphs[i], graphs[j])
     print ("\npair ({},{}) dMin = {} dMean = {}\n".format(i,j,dMin,dMean))
-    return (i, j, (dMin, dMean)))
+    return (i, j, (dMin, dMean))
 
 def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
     L = len(graphs)
