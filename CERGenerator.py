@@ -176,10 +176,10 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
         nvertices = 0
         return 0
     nvertices = max(nodeVals)
-    fileA ="graphs/tempA"+ str(random.randint(10**3,10**5))+ ".txt"
-    fileB ="graphs/tempB"+ str(random.randint(10**3,10**5))+ ".txt"
-    outputPermFile = "graphs/tempOut"+ str(random.randint(10**3,10**5))+ ".txt"
-    outputFile2 = "graphs/tempOut2" + str(random.randint(10**3,10**5))+ ".txt"
+    fileA ="graphs/tempA"+ str(random.randint(0,10**9))+ ".txt"
+    fileB ="graphs/tempB"+ str(random.randint(0,10**9))+ ".txt"
+    outputPermFile = "graphs/tempOut"+ str(random.randint(0,10**9))+ ".txt"
+    outputFile2 = "graphs/tempOut2" + str(random.randint(0,10**9))+ ".txt"
     graphToFile(graphA, fileA)
     graphToFile(graphB, fileB)
     os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputPermFile, nvertices, gpu, outputFile2))
