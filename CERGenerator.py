@@ -186,19 +186,15 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
     #The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size, GPUID
     file = open(outputFile2,'r')
     output = file.read()
-    try:
-        outputLines = output.split('\n')
-        outputLines1 = [line for line in outputLines if 'GPU Opt' in line]
-        outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
-        minDist = float(outputLines1[0].split()[-1])
-        meanDist = float(outputLines2[0].split()[-1])
-        os.system("rm {}".format(outputPermFile))
-        os.system("rm {}".format(outputFile2))
-        os.system("rm {}".format(fileA))
-        os.system("rm {}".format(fileB))
-    except:
-        minDist = -1
-        meanDist = -1
+    outputLines = output.split('\n')
+    outputLines1 = [line for line in outputLines if 'GPU Opt' in line]
+    outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
+    minDist = float(outputLines1[0].split()[-1])
+    meanDist = float(outputLines2[0].split()[-1])
+    os.system("rm {}".format(outputPermFile))
+    os.system("rm {}".format(outputFile2))
+    os.system("rm {}".format(fileA))
+    os.system("rm {}".format(fileB))
     return minDist, meanDist
 
 def minDistanceCUDA(graphA, graphB, randomGPU=True):
@@ -444,10 +440,10 @@ def pairwise_distance_matrix(graphs,metric,to_file=False, file=None, parallel=Fa
         pickle.dump(distances, outp, -1)
     return distances
 
-def distWrapper(x, graphs):
+def distWrapper(x, graphs, ngpus):
     i = x[0]
     j = x[1]
-    dMin, dMean = minAndMeanDistCUDA(graphs[i], graphs[j])
+    dMin, dMean = minAndMeanDistCUDA(graphs[i], graphs[j], ngpus)
     print ("\npair ({},{}) dMin = {} dMean = {}\n".format(i,j,dMin,dMean))
     return (i, j, (dMin, dMean))
 
@@ -457,7 +453,7 @@ def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
     meanDistances = {}
     if parallel:
         pairs = [(i,j) for j in range(L) for i in range(j)]
-        my_func = lambda x: distWrapper(x, graphs)
+        my_func = lambda x: distWrapper(x, graphs, ngpus)
         pool = Pool(NUM_CPUS)
         results = pool.map(my_func, pairs)
         minDistances = {(x[0], x[1]): x[2][0] for x in results}
