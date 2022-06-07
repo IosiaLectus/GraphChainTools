@@ -186,15 +186,19 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
     #The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size, GPUID
     file = open(outputFile2,'r')
     output = file.read()
-    outputLines = output.split('\n')
-    outputLines1 = [line for line in outputLines if 'GPU Opt' in line]
-    outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
-    minDist = float(outputLines1[0].split()[-1])
-    meanDist = float(outputLines2[0].split()[-1])
-    os.system("rm {}".format(outputPermFile))
-    os.system("rm {}".format(outputFile2))
-    os.system("rm {}".format(fileA))
-    os.system("rm {}".format(fileB))
+    try:
+        outputLines = output.split('\n')
+        outputLines1 = [line for line in outputLines if 'GPU Opt' in line]
+        outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
+        minDist = float(outputLines1[0].split()[-1])
+        meanDist = float(outputLines2[0].split()[-1])
+        os.system("rm {}".format(outputPermFile))
+        os.system("rm {}".format(outputFile2))
+        os.system("rm {}".format(fileA))
+        os.system("rm {}".format(fileB))
+    except:
+        minDist = -1
+        meanDist = -1
     return minDist, meanDist
 
 def minDistanceCUDA(graphA, graphB, randomGPU=True):
