@@ -184,9 +184,11 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
     graphToFile(graphB, fileB)
     os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputPermFile, nvertices, gpu, outputFile2))
     #The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size, GPUID
-    file = open(outputFile2,'r')
-    output = file.read()
+    minDist = -1
+    meanDist = -1
     try:
+        file = open(outputFile2,'r')
+        output = file.read()
         outputLines = output.split('\n')
         outputLines1 = [line for line in outputLines if 'GPU Opt' in line]
         outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
@@ -197,8 +199,9 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
         os.system("rm {}".format(fileA))
         os.system("rm {}".format(fileB))
     except:
-        minDist = -1
-        meanDist = -1
+        print("minAndMeanDistCUDA failed\n")
+    if meanDist<=0:
+        minDist, meanDist = minAndMeanDistCUDA(graphA, graphB, ngpus, randomGPU)
     return minDist, meanDist
 
 def minDistanceCUDA(graphA, graphB, randomGPU=True):
