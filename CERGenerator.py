@@ -195,12 +195,12 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
             outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
             minDist = float(outputLines1[0].split()[-1])
             meanDist = float(outputLines2[0].split()[-1])
-            os.system("rm {}".format(outputPermFile))
-            os.system("rm {}".format(outputFile2))
-            os.system("rm {}".format(fileA))
-            os.system("rm {}".format(fileB))
         except:
             print("minAndMeanDistCUDA failed\n")
+    os.system("rm {}".format(outputPermFile))
+    os.system("rm {}".format(outputFile2))
+    os.system("rm {}".format(fileA))
+    os.system("rm {}".format(fileB))
     return minDist, meanDist
 
 def minDistanceCUDA(graphA, graphB, randomGPU=True):
