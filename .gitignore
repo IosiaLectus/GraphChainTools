@@ -1,2 +1,4 @@
 temp
 graphs
+*.json
+__pycache__
