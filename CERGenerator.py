@@ -475,7 +475,10 @@ def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
 
 def pairwise_distance_dict_to_list(dmat_dict, L=-1):
     if L<1:
-        L = max([k[1] for k in dmat_dict.keys()])-1
+        klist = [k[1] for k in dmat_dict.keys()]
+        if len(klist)<1:
+            return {{}}
+        L = max(klist)-1
     dmat_list = [[float(dmat_dict[(i,j)]) if i<j else dmat_dict[(j,i)] if j<i else 0 for i in range(L)] for j in range(L)]
     return dmat_list
 
