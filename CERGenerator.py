@@ -477,7 +477,7 @@ def pairwise_distance_dict_to_list(dmat_dict, L=-1):
     if L<1:
         klist = [k[1] for k in dmat_dict.keys()]
         if len(klist)<1:
-            return {{}}
+            return [[]]
         L = max(klist)-1
     dmat_list = [[float(dmat_dict[(i,j)]) if i<j else dmat_dict[(j,i)] if j<i else 0 for i in range(L)] for j in range(L)]
     return dmat_list
@@ -519,6 +519,18 @@ def evaluate_perms(perms):
         correct_count = len(correct_perms)
         correct_to_index.append(correct_count/total_number)
     return correct_to_index, correct_at_index
+
+
+def first_error(perm):
+    L = len(perm)
+    for i in range(L):
+        if not perm[i]==i:
+            return i
+    return L
+
+def first_error_stats(dmats):
+    first_errors = [first_error(order_from_distance_matrix_list(dmat)) for dmat in dmats]
+    return np.mean(first_errors), np.std(first_errors)
 
 
 
@@ -657,8 +669,8 @@ def json_report(fname):
                 else:
                     for metric in dict[n][p][q].keys():
                         print("      {}:".format(metric))
-                        #dmats = dict[n][p][q][metric]
-                        #print("        {}".format(dmats))
+                        dmats = dict[n][p][q][metric]
+                        print("        {}".format(dmats))
                     '''
                     for metric in dict[n][p][q].keys():
                         print("      {}:".format(metric))
@@ -851,6 +863,40 @@ def chains_to_dmats_json_partial(fin, fout, metric, metric_name, n, p, q, parall
     else:
         print("n not found")
         return
+    json_file = open(fout, "w")
+    json.dump(dict_out, json_file)
+    json_file.close()
+
+
+def dmats_to_first_errors(fin, fout):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    try:
+        json_file = open(fout,"r")
+        dict_out = json.load(json_file)
+        json_file.close()
+    except:
+        dict_out = {}
+    nlist = [n for n in dict_in.keys() if int(n)<30]
+    for n in nlist:
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                for metric in dict_in[n][p][q].keys():
+                    dmats = dict_in[n][p][q][metric]
+                    mean_name = "average first error for {} greedy".format(metric)
+                    std_name = "std of first error for {} greedy".format(metric)
+                    mean, std = first_error_stats(dmats)
+                    if n in dict_out.keys():
+                        if p in dict_out[n].keys():
+                            if q in dict_out[n][p].keys():
+                                dict_out[n][p][q].update({mean_name: mean, std_name: std})
+                            else:
+                                dict_out[n][p].update({q: {mean_name: mean, std_name: std}})
+                        else:
+                            dict_out[n].update({p: {q: {mean_name: mean, std_name: std}}})
+                    else:
+                        dict_out.update({n: {p: {q: {mean_name: mean, std_name: std}}}})
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
     json_file.close()
