@@ -182,7 +182,7 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
     minDist = -1
     meanDist = -1
     gpu = 0
-    while meanDist<=0:
+    while meanDist<0:
         if randomGPU:
             gpu = random.randint(0,ngpus-1)
         os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputPermFile, nvertices, gpu, outputFile2))
