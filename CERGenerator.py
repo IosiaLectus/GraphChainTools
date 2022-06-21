@@ -454,6 +454,8 @@ def distWrapper(x, graphs, ngpus):
     j = x[1]
     dMin, dMean = minAndMeanDistCUDA(graphs[i], graphs[j], ngpus)
     #print ("\npair ({},{}) dMin = {} dMean = {}\n".format(i,j,dMin,dMean))
+    if np.randint(1,10)>9:
+        print("*" end="")
     return (i, j, (dMin, dMean))
 
 def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
