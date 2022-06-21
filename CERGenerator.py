@@ -185,21 +185,20 @@ def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
     minDist = -1
     meanDist = -1
     gpu = 0
-    while meanDist<0:
-        if randomGPU:
-            gpu = random.randint(0,ngpus-1)
-        os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputPermFile, nvertices, gpu, outputFile2))
-        #The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size, GPUID
-        try:
-            file = open(outputFile2,'r')
-            output = file.read()
-            outputLines = output.split('\n')
-            outputLines1 = [line for line in outputLines if 'GPU Opt' in line]
-            outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
-            minDist = float(outputLines1[0].split()[-1])
-            meanDist = float(outputLines2[0].split()[-1])
-        except:
-            print("minAndMeanDistCUDA failed\n")
+    if randomGPU:
+        gpu = random.randint(0,ngpus-1)
+    os.system("./bruteforce {} {} {} 1 0 0 {} {} >> {}".format(fileA, fileB, outputPermFile, nvertices, gpu, outputFile2))
+    #The arguments must be filenameA, filenameB, outputfile, L1vsL2, directed/undirected, gpu/cpu, size, GPUID
+    try:
+        file = open(outputFile2,'r')
+        output = file.read()
+        outputLines = output.split('\n')
+        outputLines1 = [line for line in outputLines if 'GPU Opt' in line]
+        outputLines2 = [line for line in outputLines if 'GPU Mean' in line]
+        minDist = float(outputLines1[0].split()[-1])
+        meanDist = float(outputLines2[0].split()[-1])
+    except:
+        print("minAndMeanDistCUDA failed\n")
     os.system("rm {}".format(outputPermFile))
     os.system("rm {}".format(outputFile2))
     os.system("rm {}".format(fileA))
@@ -790,7 +789,7 @@ def chains_to_dmats_json_CUDA(fin, fout, ngpus=1, parallel=True):
     json.dump(dict_out, json_file)
     json_file.close()
 
-def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True):
+def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True, debug=False):
     json_file = open(fin,"r")
     dict_in = json.load(json_file)
     json_file.close()
@@ -817,7 +816,12 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
         dmat_pair = pairwise_distance_matrix_CUDA(c, ngpus, parallel)
         for metric in metrics:
             metric_name = metric_names[metric]
-            dmats.append(pairwise_distance_dict_to_list(dmat_pair[metric_pos[metric]]))
+            matrix = pairwise_distance_dict_to_list(dmat_pair[metric_pos[metric]])
+            if debug:
+                matrix_file = open("matrix_N{}_p{}_q{}_instance{}.txt".format(n,p,q,count))
+                matrix_file.write(matrix)
+                matrix_file.close()
+            dmats.append(matrix)
             if n in dict_out.keys():
                 if p in dict_out[n].keys():
                     if q in dict_out[n][p].keys():
@@ -1053,7 +1057,7 @@ def main():
     metric = doublyStochasticMatrixDistance
     mname = metricNames[metric]
     for q in qlist:
-        chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=True)
+        chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=True, debug=True)
         print("p={}, q={}, metric={} finished".format(p,q,mname))
 
     '''
