@@ -450,7 +450,7 @@ def distWrapper(x, graphs, ngpus):
     i = x[0]
     j = x[1]
     dMin, dMean = minAndMeanDistCUDA(graphs[i], graphs[j], ngpus)
-    print ("\npair ({},{}) dMin = {} dMean = {}\n".format(i,j,dMin,dMean))
+    #print ("\npair ({},{}) dMin = {} dMean = {}\n".format(i,j,dMin,dMean))
     return (i, j, (dMin, dMean))
 
 def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
@@ -804,12 +804,15 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
     p = str(p)
     q = str(q)
     chains = dict_in[n][p][q]['chains']
-    dmat_pairs = [pairwise_distance_matrix_CUDA(c, ngpus, parallel) for c in chains]
+    #dmat_pairs = [pairwise_distance_matrix_CUDA(c, ngpus, parallel) for c in chains]
     dmats = []
-    for metric in metrics:
-        metric_name = metric_names[metric]
-        for c in dmat_pairs:
-            dmats.append(pairwise_distance_dict_to_list(c[metric_pos[metric]]))
+    count = 0
+    for c in chains:
+        count += 1
+        dmat_pair = pairwise_distance_matrix_CUDA(c, ngpus, parallel)
+        for metric in metrics:
+            metric_name = metric_names[metric]
+            dmats.append(pairwise_distance_dict_to_list(dmat_pair[metric_pos[metric]]))
             if n in dict_out.keys():
                 if p in dict_out[n].keys():
                     if q in dict_out[n][p].keys():
@@ -823,6 +826,7 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
             json_file = open(fout, "w")
             json.dump(dict_out, json_file)
             json_file.close()
+        print("{} out of {} chains finished".format(count, len(chains)))
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
     json_file.close()
