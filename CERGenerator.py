@@ -1,8 +1,9 @@
 import sys, os, subprocess, random, time, pickle, json
-import networkx as nx
+try:
+    import networkx as nx
+    from matplotlib import pyplot as plt
 import numpy as np
 from functools import reduce
-from matplotlib import pyplot as plt
 from itertools import permutations
 from multiprocessing.dummy import Pool
 from multiprocessing import cpu_count
