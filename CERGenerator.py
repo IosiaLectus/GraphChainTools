@@ -805,23 +805,24 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
     q = str(q)
     chains = dict_in[n][p][q]['chains']
     dmat_pairs = [pairwise_distance_matrix_CUDA(c, ngpus, parallel) for c in chains]
+    dmats = []
     for metric in metrics:
         metric_name = metric_names[metric]
-        if n in dict_out.keys():
-            if p in dict_out[n].keys():
-                if q in dict_out[n][p].keys():
-                    if not metric_name in dict_out[n][p][q].keys():
-                        dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+        for c in dmat_pairs:
+            dmats.append(pairwise_distance_dict_to_list(c[metric_pos[metric]]))
+            if n in dict_out.keys():
+                if p in dict_out[n].keys():
+                    if q in dict_out[n][p].keys():
                         dict_out[n][p][q].update({metric_name: dmats})
+                    else:
+                        dict_out[n][p].update({q: {metric_name: dmats}})
                 else:
-                    dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
-                    dict_out[n][p].update({q: {metric_name: dmats}})
+                    dict_out[n].update({p: {q: {metric_name: dmats}}})
             else:
-                dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
-                dict_out[n].update({p: {q: {metric_name: dmats}}})
-        else:
-            dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
-            dict_out.update({n: {p: {q: {metric_name: dmats}}}})
+                dict_out.update({n: {p: {q: {metric_name: dmats}}}})
+            json_file = open(fout, "w")
+            json.dump(dict_out, json_file)
+            json_file.close()
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
     json_file.close()
