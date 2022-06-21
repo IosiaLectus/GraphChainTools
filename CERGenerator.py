@@ -2,6 +2,8 @@ import sys, os, subprocess, random, time, pickle, json
 try:
     import networkx as nx
     from matplotlib import pyplot as plt
+except:
+    print("\nimporting networkx and pyplot failed\n")
 import numpy as np
 from functools import reduce
 from itertools import permutations
