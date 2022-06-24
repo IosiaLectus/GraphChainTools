@@ -1057,7 +1057,7 @@ def main():
     metric = doublyStochasticMatrixDistance
     mname = metricNames[metric]
     for q in qlist:
-        chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=True, debug=True)
+        chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=True, debug=False)
         print("p={}, q={}, metric={} finished".format(p,q,mname))
 
     '''
