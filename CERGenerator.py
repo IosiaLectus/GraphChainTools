@@ -1025,6 +1025,31 @@ def chains_to_edge_count_scores(fin, fout):
     json.dump(dict_out, json_file)
     json_file.close()
 
+def validate_dmats(fin, strict=False):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    for n in dict_in.keys():
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                for metric in dict_in[n][p][q].keys():
+                    matrix_list = dict_in[n][p][q][metric]
+                    print("\nFor n={}, p={}, q={}, metric={}, there are errors at:".format(n,p,q,metric))
+                    error_count = 0
+                    for i in range(len(matrix_list)):
+                        for j in range(len(matrix_list[i])):
+                            for k in range(j+1,len(matrix_list[i][j])):
+                                if strict:
+                                    if matrix_list[i][j][k] < 0:
+                                        print(" error at iteration {}, position {},{}".format(i,j,k))
+                                        error_count+=1
+                                else:
+                                    if matrix_list[i][j][k] <= 0:
+                                        print(" error at iteration {}, position {},{}".format(i,j,k))
+                                        error_count+=1
+                    print("For a total of {} errors".format(error_count))
+
+
 
 
 #########################
@@ -1046,7 +1071,8 @@ def main():
     nvertices = 12
     ngraphs = 100
     #plist = [0.05,0.1,0.2,0.3,0.4,0.5]
-    qlist = [0.01,0.05,0.1,0.2,0.3]
+    #qlist = [0.01,0.05,0.1,0.2,0.3]
+    qlist = [0.3, 0.2, 0.1, 0.05, 0.01]
 
     metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
     metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
