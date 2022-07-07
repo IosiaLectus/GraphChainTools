@@ -172,7 +172,7 @@ def meanDistance(graphA, graphB):
 
 def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
     # for testing
-    return 1, 11
+    # return 1, 11
     nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
     if len(nodeVals)==0:
         nvertices = 0
