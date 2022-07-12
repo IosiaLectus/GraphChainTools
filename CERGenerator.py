@@ -171,6 +171,8 @@ def meanDistance(graphA, graphB):
     return ret
 
 def minAndMeanDistCUDA(graphA, graphB, ngpus=1, randomGPU=True):
+    # for testing
+    # return 1, 11
     nodeVals = [pair[1] for pair in graphA] + [pair[1] for pair in graphB]
     if len(nodeVals)==0:
         nvertices = 0
@@ -367,6 +369,8 @@ def order_from_distance_matrix(dmat, shuffle=False):
 
 def order_from_distance_matrix_list(dmat, shuffle=False):
     ngraphs = len(dmat)
+    if not len(dmat[0])==ngraphs:
+        print("\ndmat is not a square matrix\n")
     graphsLeft = [i for i in range(1,ngraphs)]
     graphsLeft.reverse()
     if shuffle:
@@ -379,7 +383,7 @@ def order_from_distance_matrix_list(dmat, shuffle=False):
         for i in range(1,len(graphsLeft)):
             thisPair = [ordered[-1],graphsLeft[i]]
             thisLen = dmat[thisPair[0]][thisPair[1]]
-            if currentBestLen > thisLen:
+            if currentBestLen > thisLen and thisLen>=0:
                 indexMin = i
                 currentBestLen = thisLen
         ordered.append(graphsLeft.pop(indexMin))
@@ -477,13 +481,15 @@ def pairwise_distance_matrix_CUDA(graphs, ngpus=1, parallel=False):
                 meanDistances.update({(i,j): dMean})
     return minDistances, meanDistances
 
-def pairwise_distance_dict_to_list(dmat_dict, L=-1):
+def pairwise_distance_dict_to_list(dmat_dict, L=-1, zero_index=False):
     if L<1:
         klist = [k[1] for k in dmat_dict.keys()]
         if len(klist)<1:
             return [[]]
-        L = max(klist)-1
-    dmat_list = [[float(dmat_dict[(i,j)]) if i<j else dmat_dict[(j,i)] if j<i else 0 for i in range(L)] for j in range(L)]
+        L = max(klist)
+        if zero_index:
+            L = L+1
+    dmat_list = [[dmat_dict[(i,j)] if i<j else dmat_dict[(j,i)] if j<i else 0 for i in range(L)] for j in range(L)]
     return dmat_list
 
 def pairwise_distances_from_folder(folder, ngraphs, metric, to_file=False, file_name=None):
@@ -674,7 +680,7 @@ def json_report(fname):
                     for metric in dict[n][p][q].keys():
                         print("      {}:".format(metric))
                         dmats = dict[n][p][q][metric]
-                        print("        {}".format(dmats))
+                        print("        lenght: {}".format(len(dmats)))
                     '''
                     for metric in dict[n][p][q].keys():
                         print("      {}:".format(metric))
@@ -774,16 +780,16 @@ def chains_to_dmats_json_CUDA(fin, fout, ngpus=1, parallel=True):
                         if p in dict_out[n].keys():
                             if q in dict_out[n][p].keys():
                                 if not metric_name in dict_out[n][p][q].keys():
-                                    dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                                    dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]], zero_index=True) for c in dmat_pairs]
                                     dict_out[n][p][q].update({metric_name: dmats})
                             else:
-                                dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                                dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]], zero_index=True) for c in dmat_pairs]
                                 dict_out[n][p].update({q: {metric_name: dmats}})
                         else:
-                            dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                            dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]], zero_index=True) for c in dmat_pairs]
                             dict_out[n].update({p: {q: {metric_name: dmats}}})
                     else:
-                        dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]]) for c in dmat_pairs]
+                        dmats = [pairwise_distance_dict_to_list(c[metric_pos[metric]], zero_index=True) for c in dmat_pairs]
                         dict_out.update({n: {p: {q: {metric_name: dmats}}}})
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
@@ -809,7 +815,7 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
     q = str(q)
     chains = dict_in[n][p][q]['chains']
     #dmat_pairs = [pairwise_distance_matrix_CUDA(c, ngpus, parallel) for c in chains]
-    dmats = []
+    dmats = [[],[]]
     count = 0
     for c in chains:
         count += 1
@@ -821,17 +827,17 @@ def chains_to_dmats_json_partial_CUDA(fin, fout, n, p, q, ngpus=1, parallel=True
                 matrix_file = open("matrix_N{}_p{}_q{}_instance{}.txt".format(n,p,q,count))
                 matrix_file.write(matrix)
                 matrix_file.close()
-            dmats.append(matrix)
+            dmats[metric_pos[metric]].append(matrix)
             if n in dict_out.keys():
                 if p in dict_out[n].keys():
                     if q in dict_out[n][p].keys():
-                        dict_out[n][p][q].update({metric_name: dmats})
+                        dict_out[n][p][q].update({metric_name: dmats[metric_pos[metric]]})
                     else:
-                        dict_out[n][p].update({q: {metric_name: dmats}})
+                        dict_out[n][p].update({q: {metric_name: dmats[metric_pos[metric]]}})
                 else:
-                    dict_out[n].update({p: {q: {metric_name: dmats}}})
+                    dict_out[n].update({p: {q: {metric_name: dmats[metric_pos[metric]]}}})
             else:
-                dict_out.update({n: {p: {q: {metric_name: dmats}}}})
+                dict_out.update({n: {p: {q: {metric_name: dmats[metric_pos[metric]]}}}})
             json_file = open(fout, "w")
             json.dump(dict_out, json_file)
             json_file.close()
@@ -931,26 +937,19 @@ def dmats_to_greedy_evals(fin,fout):
         for p in dict_in[n].keys():
             for q in dict_in[n][p].keys():
                 for metric in dict_in[n][p][q].keys():
-                    dmats =dict_in[n][p][q][metric]
+                    dmats = dict_in[n][p][q][metric]
                     evalc_name = "correct to i for {} greedy".format(metric)
                     eval_name = "correct at i for {} greedy".format(metric)
+                    evalc, eval = evaluate_metric_from_dmats_list(dmats)
                     if n in dict_out.keys():
                         if p in dict_out[n].keys():
                             if q in dict_out[n][p].keys():
-                                if not eval_name in dict_out[n][p][q].keys():
-                                    eval = evaluate_metric_from_dmats_list(dmats)[1]
-                                    dict_out[n][p][q].update({eval_name: eval})
-                                if not evalc_name in dict_out[n][p][q].keys():
-                                    evalc = evaluate_metric_from_dmats_list(dmats)[0]
-                                    dict_out[n][p][q].update({evalc_name: evalc})
+                                dict_out[n][p][q].update({evalc_name: evalc, eval_name: eval})
                             else:
-                                evalc, eval = evaluate_metric_from_dmats_list(dmats)
                                 dict_out[n][p].update({q: {evalc_name: evalc, eval_name: eval}})
                         else:
-                            evalc, eval = evaluate_metric_from_dmats_list(dmats)
                             dict_out[n].update({p: {q: {evalc_name: evalc, eval_name: eval}}})
                     else:
-                        evalc, eval = evaluate_metric_from_dmats_list(dmats)
                         dict_out.update({n: {p: {q: {evalc_name: evalc, eval_name: eval}}}})
     json_file = open(fout, "w")
     json.dump(dict_out, json_file)
@@ -1025,6 +1024,51 @@ def chains_to_edge_count_scores(fin, fout):
     json.dump(dict_out, json_file)
     json_file.close()
 
+def validate_dmats(fin, strict=False):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    for n in dict_in.keys():
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                for metric in dict_in[n][p][q].keys():
+                    matrix_list = dict_in[n][p][q][metric]
+                    print("\nFor n={}, p={}, q={}, metric={}, there are errors at:".format(n,p,q,metric))
+                    error_count = 0
+                    for i in range(len(matrix_list)):
+                        for j in range(len(matrix_list[i])):
+                            for k in range(j+1,len(matrix_list[i][j])):
+                                if strict:
+                                    if matrix_list[i][j][k] < 0:
+                                        print(" error at iteration {}, position {},{}".format(i,j,k))
+                                        error_count+=1
+                                else:
+                                    if matrix_list[i][j][k] <= 0:
+                                        print(" error at iteration {}, position {},{}".format(i,j,k))
+                                        error_count+=1
+                    print("For a total of {} errors".format(error_count))
+
+# Analyze broken dmats
+def find_broken_dmats(fin):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    for n in dict_in.keys():
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                for metric in dict_in[n][p][q].keys():
+                    dmats = dict_in[n][p][q][metric]
+                    count = 0
+                    for i in range(len(dmats)):
+                        if not len(dmats[i])==len(dmats[i][0]):
+                            #print("\ndmat at n={}, p={}, q={}, metric={}, instance {} not a square matrix:".format(n,p,q,metric,i))
+                            #print(dmats[i])
+                            count+=1
+                    if count>0:
+                        print(f"Total of {count} bad dmats out of {len(dmats)} for n={n}, p={p}, q={q}, metric={metric}")
+
+
+
 
 
 #########################
@@ -1046,7 +1090,9 @@ def main():
     nvertices = 12
     ngraphs = 100
     #plist = [0.05,0.1,0.2,0.3,0.4,0.5]
-    qlist = [0.01,0.05,0.1,0.2,0.3]
+    #qlist = [0.01,0.05,0.1,0.2,0.3]
+    #qlist = [0.3, 0.2, 0.1, 0.05, 0.01]
+    qlist = [0.2]
 
     metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
     metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}

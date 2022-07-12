@@ -2,4 +2,5 @@ from CERGenerator import *
 import sys
 
 fin = sys.argv[1]
-validate_dmats(fin,True)
+strict = int(sys.argv[2])
+validate_dmats(fin,strict)
