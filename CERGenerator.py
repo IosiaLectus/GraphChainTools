@@ -1036,16 +1036,20 @@ def validate_dmats(fin, strict=False):
                     print("\nFor n={}, p={}, q={}, metric={}, there are errors at:".format(n,p,q,metric))
                     error_count = 0
                     for i in range(len(matrix_list)):
+                        error_count_i = 0
                         for j in range(len(matrix_list[i])):
                             for k in range(j+1,len(matrix_list[i][j])):
                                 if strict:
                                     if matrix_list[i][j][k] < 0:
-                                        print(" error at iteration {}, position {},{}".format(i,j,k))
-                                        error_count+=1
+                                        #print(" error at iteration {}, position {},{}".format(i,j,k))
+                                        error_count_i+=1
                                 else:
                                     if matrix_list[i][j][k] <= 0:
-                                        print(" error at iteration {}, position {},{}".format(i,j,k))
-                                        error_count+=1
+                                        #print(" error at iteration {}, position {},{}".format(i,j,k))
+                                        error_count_i+=1
+                        if error_count_i>0:
+                            print(f"{error_count_i} errors in iteration {i}")
+                        error_count += error_count_i
                     print("For a total of {} errors".format(error_count))
 
 # Analyze broken dmats
@@ -1066,6 +1070,22 @@ def find_broken_dmats(fin):
                             count+=1
                     if count>0:
                         print(f"Total of {count} bad dmats out of {len(dmats)} for n={n}, p={p}, q={q}, metric={metric}")
+
+def remove_broken_dmats(fin):
+    json_file = open(fin,"r")
+    dict_in = json.load(json_file)
+    json_file.close()
+    for n in dict_in.keys():
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                dict_in[n][p][q].pop("meanDistanceCUDA", None)
+                for metric in dict_in[n][p][q].keys():
+                    dmats = dict_in[n][p][q][metric]
+                    dict_in[n][p][q][metric] = [d for d in dmats if not d==[[]] ]
+    json_file = open(fin, "w")
+    json.dump(dict_in, json_file)
+    json_file.close()
+
 
 
 
