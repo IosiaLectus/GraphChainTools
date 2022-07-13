@@ -1102,9 +1102,9 @@ def main():
     #num_vertices = int(sys.argv[1])
     #num_graphs = int(sys.argv[2])
     p = float(sys.argv[1])
-    ngpus = int(sys.argv[2])
+    ngpus = int(sys.argv[4])
     outfile = sys.argv[3]
-    #q = float(sys.argv[4])
+    q = float(sys.argv[2])
     #qq = q
 
     nvertices = 12
@@ -1112,7 +1112,7 @@ def main():
     #plist = [0.05,0.1,0.2,0.3,0.4,0.5]
     #qlist = [0.01,0.05,0.1,0.2,0.3]
     #qlist = [0.3, 0.2, 0.1, 0.05, 0.01]
-    qlist = [0.2]
+    #qlist = [0.2]
 
     metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
     metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
@@ -1122,9 +1122,9 @@ def main():
 
     metric = doublyStochasticMatrixDistance
     mname = metricNames[metric]
-    for q in qlist:
-        chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=True, debug=False)
-        print("p={}, q={}, metric={} finished".format(p,q,mname))
+
+    chains_to_dmats_json_partial_CUDA("data.json", outfile, nvertices, p, q, ngpus, parallel=True, debug=False)
+    print("p={}, q={}, metric={} finished".format(p,q,mname))
 
     '''
     for p in plist:
