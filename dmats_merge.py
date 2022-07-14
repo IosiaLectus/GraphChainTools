@@ -24,6 +24,11 @@ for n in dict_in.keys():
                             if not metric in dict_out[n][p][q].keys():
                                 dmats = dict_in[n][p][q][metric]
                                 dict_out[n][p][q].update({metric: dmats})
+                            else:
+                                if len(dict_out[n][p][q][metric])<len(dict_in[n][p][q][metric]):
+                                    dmats = dict_in[n][p][q][metric]
+                                    dict_out[n][p][q].update({metric: dmats})
+
                         else:
                             dmats = dict_in[n][p][q][metric]
                             dict_out[n][p].update({q: {metric: dmats}})
