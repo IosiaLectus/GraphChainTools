@@ -1112,7 +1112,6 @@ def main():
     #plist = [0.05,0.1,0.2,0.3,0.4,0.5]
     #qlist = [0.01,0.05,0.1,0.2,0.3]
     #qlist = [0.3, 0.2, 0.1, 0.05, 0.01]
-    #qlist = [0.2]
 
     metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
     metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
