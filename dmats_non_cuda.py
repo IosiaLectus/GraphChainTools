@@ -16,4 +16,4 @@ metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistan
 for m in metrics:
     mname = metricNames[m]
     print(f"doing metric = {mname}")
-    chains_to_dmats_json_partial('data.json',m,mname,nvertices,p,q)
+    chains_to_dmats_json_partial('data.json',outfile,m,mname,nvertices,p,q)
