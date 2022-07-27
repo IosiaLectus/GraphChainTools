@@ -10,7 +10,7 @@ q = float(sys.argv[2])
 nvertices = 12
 ngraphs = 100
 
-metrics = [edgeCountDistance, disagreementCount, specDistance, minDistanceCUDA, meanDistanceCUDA, doublyStochasticMatrixDistance]
+metrics = [edgeCountDistance, disagreementCount, specDistance, doublyStochasticMatrixDistance]
 metricNames = {minDistanceCUDA: "minDistanceCUDA", meanDistanceCUDA: "meanDistanceCUDA", specDistance: "specDistance", edgeCountDistance: "edgeCountDistance", disagreementCount: "disagreementCount", doublyStochasticMatrixDistance: "doublyStochasticMatrixDistance"}
 
 for m in metrics:
