@@ -1033,8 +1033,9 @@ def validate_dmats(fin, strict=False):
             for q in dict_in[n][p].keys():
                 for metric in dict_in[n][p][q].keys():
                     matrix_list = dict_in[n][p][q][metric]
-                    print("\nFor n={}, p={}, q={}, metric={}, there are errors at:".format(n,p,q,metric))
+                    #print("\nFor n={}, p={}, q={}, metric={}, there are errors at:".format(n,p,q,metric))
                     error_count = 0
+                    instance_count = 0
                     for i in range(len(matrix_list)):
                         error_count_i = 0
                         for j in range(len(matrix_list[i])):
@@ -1047,10 +1048,56 @@ def validate_dmats(fin, strict=False):
                                     if matrix_list[i][j][k] <= 0:
                                         #print(" error at iteration {}, position {},{}".format(i,j,k))
                                         error_count_i+=1
+                        #if error_count_i>0:
+                            #print(f"{error_count_i} errors in iteration {i}")
                         if error_count_i>0:
-                            print(f"{error_count_i} errors in iteration {i}")
+                            instance_count+=1
                         error_count += error_count_i
-                    print("For a total of {} errors".format(error_count))
+                    #print("For a total of {} errors".format(error_count))
+                    if error_count>0:
+                        print("\nFor n={}, p={}, q={}, metric={}, there are {} total errors in {} instances".format(n,p,q,metric, error_count, instance_count))
+
+def validate_and_correct_dmats(fin, fgraphs, strict=True):
+    metric_from_name = {
+        "minDistanceCUDA": minDistanceCUDA,
+        "meanDistanceCUDA": meanDistanceCUDA,
+        "specDistance": specDistance,
+        "edgeCountDistance": edgeCountDistance,
+        "disagreementCount": disagreementCount,
+        "doublyStochasticMatrixDistance": doublyStochasticMatrixDistance
+        }
+    json_file = open(fin,"r")
+    json_file_graphs = open(fgraphs, "r")
+    dict_in = json.load(json_file)
+    graphs_dict = json.load(json_file_graphs)
+    json_file.close()
+    for n in dict_in.keys():
+        for p in dict_in[n].keys():
+            for q in dict_in[n][p].keys():
+                for metric in dict_in[n][p][q].keys():
+                    matrix_list = dict_in[n][p][q][metric]
+                    count = 0
+                    uncorrected_count = 0
+                    for i in range(len(matrix_list)):
+                        for j in range(len(matrix_list[i])):
+                            for k in range(j+1,len(matrix_list[i][j])):
+                                if (strict and matrix_list[i][j][k] < 0) or (strict==False and matrix_list[i][j][k] <= 0):
+                                    try:
+                                        graphA = graphs_dict[n][p][q][i][j]
+                                        graphB = graphs_dict[n][p][q][i][k]
+                                        dist = metric_from_name[metric](graphA, graphB)
+                                        dict_in [n][p][q][metric][i][j][k] = dist
+                                        dict_in [n][p][q][metric][i][k][j] = dist
+                                        count+=1
+                                    except:
+                                        uncorrected_count+=1
+                    if count>0:
+                        print(f"recomputed {count} entries for n={n}, p={p}, q={q}, metric={metric}")
+                    if uncorrected_count>0:
+                        print(f"failed to recompute {uncorrected_count} entries for n={n}, p={p}, q={q}, metric={metric}")
+    json_file = open(fin, "w")
+    json.dump(dict_in, json_file)
+    json_file.close()
 
 # Analyze broken dmats
 def find_broken_dmats(fin):
